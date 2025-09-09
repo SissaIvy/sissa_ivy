@@ -6,6 +6,11 @@ inputs:
   seed: {type: integer, default: 42}
   n_events: {type: integer, default: 500}
   bandit_enable: {type: boolean, default: false}
+  max_cost_per_event_usd: {type: number, default: 0.001}
+  max_token_cost_usd: {type: number, default: 1000000000}
+  explainability_min: {type: number, default: 0.95}
+  fail_rate_strict_max: {type: number, default: 0.10}
+  fail_rate_explore_max: {type: number, default: 0.15}
 compute: azureml:cpu-cluster
 settings:
   default_compute: azureml:cpu-cluster
@@ -47,6 +52,11 @@ jobs:
     inputs:
       strict_results: ${{jobs.sim_strict.outputs.results}}
       explore_results: ${{jobs.sim_explore.outputs.results}}
+      max_cost_per_event_usd: ${{parent.inputs.max_cost_per_event_usd}}
+      max_token_cost_usd: ${{parent.inputs.max_token_cost_usd}}
+      explainability_min: ${{parent.inputs.explainability_min}}
+      fail_rate_strict_max: ${{parent.inputs.fail_rate_strict_max}}
+      fail_rate_explore_max: ${{parent.inputs.fail_rate_explore_max}}
     outputs:
       report: {mode: upload}
 
@@ -59,4 +69,3 @@ jobs:
     outputs:
       allocation: {mode: upload}
     condition: ${{parent.inputs.bandit_enable}}
-

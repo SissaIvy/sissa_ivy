@@ -1,4 +1,4 @@
-import argparse, json
+import argparse, json, os
 from pathlib import Path
 
 
@@ -7,6 +7,32 @@ def main():
     ap.add_argument("--strict_results", type=str, required=True)
     ap.add_argument("--explore_results", type=str, required=True)
     ap.add_argument("--report_json", type=str, required=True)
+    # Submit-time tunables (CLI wins; fallback to env; then defaults)
+    ap.add_argument(
+        "--max-cost-per-event-usd",
+        type=float,
+        default=float(os.getenv("EVAL_MAX_COST_PER_EVENT_USD", "0.001")),
+    )
+    ap.add_argument(
+        "--max-token-cost-usd",
+        type=float,
+        default=float(os.getenv("EVAL_MAX_TOKEN_COST_USD", "1000000000")),
+    )
+    ap.add_argument(
+        "--explainability-min",
+        type=float,
+        default=float(os.getenv("EVAL_EXPLAINABILITY_MIN", "0.95")),
+    )
+    ap.add_argument(
+        "--fail-rate-strict-max",
+        type=float,
+        default=float(os.getenv("EVAL_FAIL_RATE_STRICT_MAX", "0.10")),
+    )
+    ap.add_argument(
+        "--fail-rate-explore-max",
+        type=float,
+        default=float(os.getenv("EVAL_FAIL_RATE_EXPLORE_MAX", "0.15")),
+    )
     args = ap.parse_args()
 
     strict = json.loads(Path(args.strict_results).read_text(encoding="utf-8"))
@@ -38,12 +64,13 @@ def main():
 
     s = metrics(strict)
     e = metrics(explore)
-    # gate examples
+    # gates (overridable)
     gates = {
-        "fail_rate_strict_max": 0.10,
-        "fail_rate_explore_max": 0.15,
-        "explainability_min": 0.95,
-        "max_cost_per_event_usd": 0.001,  # tune: $1 per 1k events
+        "fail_rate_strict_max": args.fail_rate_strict_max,
+        "fail_rate_explore_max": args.fail_rate_explore_max,
+        "explainability_min": args.explainability_min,
+        "max_cost_per_event_usd": args.max_cost_per_event_usd,
+        "max_token_cost_usd": args.max_token_cost_usd,
     }
     decision = "PASS"
     issues = []
@@ -59,6 +86,9 @@ def main():
     if max(s["cost_per_event_usd"], e["cost_per_event_usd"]) > gates["max_cost_per_event_usd"]:
         decision = "HOLD"
         issues.append("Cost per event above budget")
+    if max(s.get("token_cost_usd", 0), e.get("token_cost_usd", 0)) > gates["max_token_cost_usd"]:
+        decision = "HOLD"
+        issues.append("Token cost above budget")
 
     report = {
         "evaluated_at_et": strict["meta"]["generated_at_et"],

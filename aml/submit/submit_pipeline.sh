@@ -19,3 +19,10 @@ az ml compute create --name cpu-cluster --size STANDARD_DS3_V2 --min-instances 0
 # Submit pipeline
 az ml job create --file aml/pipelines/closed_loop_battletest.pipeline.yaml
 
+# Example with budget/quality overrides at submit-time:
+# az ml job create --file aml/pipelines/closed_loop_battletest.pipeline.yaml \
+#   --set inputs.max_cost_per_event_usd=0.0008 \
+#         inputs.max_token_cost_usd=0.10 \
+#         inputs.explainability_min=0.97 \
+#         inputs.fail_rate_strict_max=0.08 \
+#         inputs.fail_rate_explore_max=0.12

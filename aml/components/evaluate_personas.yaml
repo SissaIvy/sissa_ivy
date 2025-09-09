@@ -5,6 +5,11 @@ type: command
 inputs:
   strict_results: {type: uri_file}
   explore_results: {type: uri_file}
+  max_cost_per_event_usd: {type: number, default: 0.001}
+  max_token_cost_usd: {type: number, default: 1000000000}
+  explainability_min: {type: number, default: 0.95}
+  fail_rate_strict_max: {type: number, default: 0.10}
+  fail_rate_explore_max: {type: number, default: 0.15}
 outputs:
   report: {type: uri_file}
 code: .
@@ -14,4 +19,8 @@ command: >-
   --strict_results ${{inputs.strict_results}}
   --explore_results ${{inputs.explore_results}}
   --report_json ${{outputs.report}}
-
+  --max-cost-per-event-usd ${{inputs.max_cost_per_event_usd}}
+  --max-token-cost-usd ${{inputs.max_token_cost_usd}}
+  --explainability-min ${{inputs.explainability_min}}
+  --fail-rate-strict-max ${{inputs.fail_rate_strict_max}}
+  --fail-rate-explore-max ${{inputs.fail_rate_explore_max}}
