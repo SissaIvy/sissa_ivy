@@ -1,0 +1,87 @@
+name: aml-smoke
+
+on:
+  pull_request:
+    paths:
+      - "closed_loop_security.py"
+      - "aml/components/**"
+      - ".github/workflows/aml-smoke.yml"
+      - "docs/**"
+  push:
+    branches: [ main, develop, feat/** ]
+    paths:
+      - "closed_loop_security.py"
+      - "aml/components/**"
+      - ".github/workflows/aml-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Version
+        run: python -V
+
+      - name: Generate scenarios (50)
+        run: |
+          python aml/components/generate_scenarios.py \
+            --n_events 50 \
+            --out_path scenarios.jsonl
+
+      - name: Simulate (strict & explore)
+        run: |
+          python aml/components/simulate_closed_loop.py \
+            --scenarios scenarios.jsonl \
+            --profile strict \
+            --results_json strict.json
+          python aml/components/simulate_closed_loop.py \
+            --scenarios scenarios.jsonl \
+            --profile explore \
+            --results_json explore.json
+
+      - name: Evaluate personas
+        run: |
+          python aml/components/evaluate_personas.py \
+            --strict_results strict.json \
+            --explore_results explore.json \
+            --report_json report.json
+
+      - name: Assert gates (no FAIL; explainability ≥ 0.95)
+        run: |
+          python - <<'PY'
+          import json, sys
+          d = json.load(open('report.json'))
+          dec = d.get('decision')
+          if dec == 'FAIL':
+              sys.exit('AML smoke gates decision=FAIL')
+          for k in ('strict','explore'):
+              if d.get(k,{}).get('explainability_rate',0) < 0.95:
+                  sys.exit(f"Explainability below threshold for {k}")
+          print("AML smoke: OK — decision:", dec, "strict/explore explainability OK")
+          PY
+
+      - name: Upload smoke artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aml-smoke-artifacts
+          path: |
+            scenarios.jsonl
+            strict.json
+            explore.json
+            report.json
+
