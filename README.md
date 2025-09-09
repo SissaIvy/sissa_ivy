@@ -131,6 +131,7 @@ This project is licensed under the [Apache 2.0 License](LICENSE).
 ## Suntari Allegory (Closed‑Loop SOC)
 - Guide: `docs/Suntari_Allegory_Closed_Loop_SOC.md`
 - Cast & Roles appendix: `docs/Suntari_Cast_and_Roles.md`
+- VS Code Mastermind seed: `docs/SISSA_Mastermind_Seed.md` (JSON at `.vscode/SISSA_Mastermind_Seed.v1.json`)
 
 ### Cost & ROI knobs
 Runs can report blended per‑event cost, token cost, and ROI/ROE in their JSON outputs. Set env vars locally (or inject into Azure ML jobs). See `README-aml.md` → “Cost & ROI knobs”.
