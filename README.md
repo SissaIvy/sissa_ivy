@@ -122,3 +122,6 @@ Project Setup (GitHub Projects v2 Automation)
 
 5) Iteration assignment (optional)
 - If `SET_ITERATION=true` and the Project has an Iteration field, the workflow can assign the current iteration. Adjust `FIELD_ITERATION_NAME` env in the workflow if your field name differs.
+
+## License
+This project is licensed under the [Apache 2.0 License](LICENSE).

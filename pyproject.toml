@@ -8,8 +8,11 @@ version = "0.2.0"
 description = "Minimal, dependency-free episodic memory store with JSON loader and retrieval"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "Proprietary"}
-authors = [{ name = "Your Company", email = "dev@example.com" }]
+license = { file = "LICENSE" }
+authors = [
+  { name = "Hakeem Moore" },
+  { name = "Suntari Comics LLC" }
+]
 keywords = ["memory", "retrieval", "vector", "json"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -17,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
   "jsonschema>=4.18.0",
