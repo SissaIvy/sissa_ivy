@@ -127,3 +127,7 @@ Project Setup (GitHub Projects v2 Automation)
 
 ## License
 This project is licensed under the [Apache 2.0 License](LICENSE).
+
+## Suntari Allegory (Closed‑Loop SOC)
+- Guide: `docs/Suntari_Allegory_Closed_Loop_SOC.md`
+- Cast & Roles appendix: `docs/Suntari_Cast_and_Roles.md`
