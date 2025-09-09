@@ -29,6 +29,7 @@ dependencies = [
 
 [project.scripts]
 episodic-memory = "memory_cli:main"
+closed-loop-security = "memory_cli:main"
 
 [tool.setuptools.package-data]
 episodic_memory = ["py.typed", "schemas/*.json"]
