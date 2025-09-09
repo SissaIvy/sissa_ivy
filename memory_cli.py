@@ -568,6 +568,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Deprecation banner for legacy console script name
+    try:
+        invoked = os.path.basename(sys.argv[0]) if sys.argv else ""
+        if invoked == "episodic-memory":
+            print(
+                "DEPRECATION WARNING: 'episodic-memory' is deprecated. "
+                "Use 'closed-loop-security' going forward. This alias will be removed in a future release.",
+                file=sys.stderr,
+            )
+    except Exception:  # pragma: no cover
+        pass
+
     p = build_parser()
     args = p.parse_args(argv)
     return args.func(args)
