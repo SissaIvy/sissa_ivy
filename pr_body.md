@@ -16,7 +16,7 @@ This is primarily orchestration, CI and documentation + safety guardrails. No br
 - Safety & cost control: submit-time gates let reviewers and infra enforce budget/explainability thresholds before compute-heavy runs.
 - Tested: unit + smoke tests for FAISS and closed-loop flow. 10/10 unit tests pass locally.
 - Production readiness: CI smoke jobs isolate heavy deps (FAISS/AML) to dedicated runners; meta persistence avoids repeated scans.
-- Governance: CODEOWNERS + labeler automates ownership and PR triage.
+- Governance: CODEOWNERS + labeler automates ownership and PR triage; VS Code Mastermind guardrail seed added for IDE personas (`.vscode/SISSA_Mastermind_Seed.v1.json`).
 
 ## Changed / Added (high level)
 - `closed_loop_security.py` (core)
