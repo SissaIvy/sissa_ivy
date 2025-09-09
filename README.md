@@ -14,6 +14,10 @@ Quick Start
   - With schema: `python memory_cli.py validate EpisodicMemorySystem.json --schema`
 - Search (override threshold for the demo):
   - `python memory_cli.py search EpisodicMemorySystem.json "episodic" --threshold 0.1`
+  - Choose query embedder when needed (use the same backend used to build vectors):
+    - Hash: `python memory_cli.py search EpisodicMemorySystem.json "episodic" --embedder hash`
+    - OpenAI: `python memory_cli.py search EpisodicMemorySystem.json "episodic" --embedder openai --openai-model text-embedding-3-small`
+    - Local ST: `python memory_cli.py search EpisodicMemorySystem.json "episodic" --embedder local`
 - Add a memory and persist:
   - `python memory_cli.py add EpisodicMemorySystem.json "My new memory" --tags test foo --importance 0.6`
   - With OpenAI embeddings: `python memory_cli.py add EpisodicMemorySystem.json "My new memory" --embedder openai --openai-model text-embedding-3-small`
@@ -46,12 +50,15 @@ API Server
   - `POST /search` { path, query, top_k, threshold? }
   - `POST /add` { path, text, tags[], importance, reward, tone, embedder?, openai_model?, embed_dim? }
 
+Programmatic Version
+- In Python: `import episodic_memory as em; print(em.__version__)` (e.g., `0.2.0`)
+
 ANN Index (FAISS)
 - Build from a single file:
   - `episodic-memory index-build EpisodicMemorySystem.json index.faiss --sleep-ms 5`
 - Build from a directory of JSON files:
   - `episodic-memory index-build --data path/to/data/ --output indexes/faiss.index --batch-size 256 --sleep-ms 50`
- - Search with a prebuilt index:
+- Search with a prebuilt index:
   - `episodic-memory index-search indexes/faiss.index "episodic" --top-k 3`
   - Note: when indexing a directory, result IDs are `file.json::memory_id`. Snippets may be empty unless you look up the source file. Use `--data` to supply a meta file or directory for snippets.
 
@@ -66,6 +73,8 @@ Index Search Flags & Behavior
 - `--min-score <float>`: filter results by minimum inner-product score (useful for normalized IP indexes).
 - `--max-distance <float>`: filter results by max L2 distance (for L2 indexes).
 - `--top-k <N>`: number of nearest neighbors to retrieve.
+
+Tip: When using IP/cosine indexes (e.g., IndexFlatIP), `--max-distance` is ignored and a warning is printed. Use an L2 index to apply a max-distance filter.
 
 Example (persist meta after resolving snippets from a data directory):
 
@@ -87,3 +96,29 @@ Notes
 - The included embedding is a placeholder. Swap `_hash_embed` in `episodic_memory/store.py` with a production embedding model or a vector DB integration for commercial deployments.
 - The loader tolerates extra JSON fragments by extracting the final valid object; keep files clean in production.
  - The fixer rebuilds clusters and temporal index to align with embeddings and metadata.
+
+Project Setup (GitHub Projects v2 Automation)
+- This repo auto-adds Issues/PRs to a Projects v2 board and sets fields from labels/lifecycle.
+
+1) Configure repository variables (Settings → Actions → Variables)
+- `ORG_LOGIN`: org or user login (e.g., YourOrg or your-username)
+- `PROJECT_NUMBER`: project number (e.g., 1)
+- `PROJECT_OWNER_TYPE`: `org` (default) or `user`
+- `SET_ITERATION`: `true`/`false` (default `false`)
+
+2) Ensure Project fields exist (single-select, exact names)
+- Status: Backlog, In Progress, Review, Done
+- Type: Feature, Enabler, Spike, Bug
+
+3) Label → field mapping
+- `feature` → Type=Feature; `enabler` → Type=Enabler; `spike` → Type=Spike; `bug` → Type=Bug
+- Status: default Backlog; `status:in-progress` → In Progress; `status:review` → Review; `status:done` or closed → Done
+
+4) 60-second validation
+- Manually dispatch workflow (Actions → Project Automation → Run)
+- Open an Issue with label `feature` → appears with Type=Feature, Status=Backlog
+- Add label `status:in-progress` → moves to In Progress
+- Close the Issue → Status=Done
+
+5) Iteration assignment (optional)
+- If `SET_ITERATION=true` and the Project has an Iteration field, the workflow can assign the current iteration. Adjust `FIELD_ITERATION_NAME` env in the workflow if your field name differs.

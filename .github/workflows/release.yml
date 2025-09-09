@@ -1,9 +1,15 @@
-name: Release
+name: Release (auto-generate notes)
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: read
 
 jobs:
   github-release:
@@ -11,27 +17,76 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive tag / version
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME:-manual}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Extract notes for tag
         id: notes
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.ver.outputs.tag }}"
           awk -v tag="${TAG}" '
             BEGIN {found=0}
             $0 ~ "^##[[:space:]]+" tag {found=1}
             found && NR>1 && $0 ~ /^##[[:space:]]+/ {exit}
             found {print}
-          ' CHANGELOG.md > RELEASE_NOTES.md
+          ' CHANGELOG.md > RELEASE_NOTES.md || true
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "# ${TAG}" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "- Automated release; see commit history." >> RELEASE_NOTES.md
+          fi
           echo "--- RELEASE NOTES ---"
           cat RELEASE_NOTES.md
+
+      - name: Build artifacts (optional)
+        run: |
+          python -m pip install --upgrade pip build >/dev/null 2>&1 || true
+          python -m build || true
+
+      - name: Generate SBOM (optional)
+        run: |
+          python -m pip install cyclonedx-bom >/dev/null 2>&1 || true
+          python -m pip install cyclonedx-python-lib >/dev/null 2>&1 || true
+          command -v cyclonedx-py >/dev/null 2>&1 && cyclonedx-py --format json --output sbom.json --evidence || true
+
+      - name: Check built artifacts
+        id: dist
+        shell: bash
+        run: |
+          HAS=false
+          ls dist/*.whl dist/*.tar.gz >/dev/null 2>&1 && HAS=true || true
+          echo "has_dist=${HAS}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign artifacts with Sigstore (optional)
+        if: ${{ steps.dist.outputs.has_dist == 'true' }}
+        uses: sigstore/gh-action-sigstore@v2
+        with:
+          inputs: |
+            dist/*.whl
+            dist/*.tar.gz
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
           body_path: RELEASE_NOTES.md
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/*.whl.sig
+            dist/*.whl.crt
+            dist/*.tar.gz.sig
+            dist/*.tar.gz.crt
+            sbom.json
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

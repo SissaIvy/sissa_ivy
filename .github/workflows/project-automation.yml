@@ -1,0 +1,241 @@
+name: Project Automation (Issues & PRs → Projects v2)
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, reopened, closed, assigned]
+  pull_request:
+    types: [opened, edited, labeled, unlabeled, reopened, closed, ready_for_review, review_requested]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  projects: write
+
+env:
+  # Configure these in repo Settings → Secrets and variables → Actions → Variables
+  ORG_LOGIN: ${{ vars.ORG_LOGIN }}            # e.g., org/user login
+  PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}  # e.g., 1
+  # Optional: 'org' (default) or 'user' if the project lives under a user account
+  PROJECT_OWNER_TYPE: ${{ vars.PROJECT_OWNER_TYPE }}
+  # Optional: set to 'true' to attempt iteration assignment (not enabled by default)
+  SET_ITERATION: ${{ vars.SET_ITERATION }}
+  FIELD_STATUS_NAME: "Status"
+  FIELD_TYPE_NAME: "Type"
+  FIELD_ITERATION_NAME: "Iteration"
+
+jobs:
+  sync-to-project:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve item node ID (Issue or PR)
+        id: item
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isIssue = !!context.payload.issue;
+            const number = isIssue ? context.payload.issue.number : context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            const query = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  issueOrPullRequest(number:$number) {
+                    __typename
+                    ... on Issue { id number }
+                    ... on PullRequest { id number }
+                  }
+                }
+              }`;
+            const res = await github.graphql(query, { owner, repo, number });
+            const node = res.repository.issueOrPullRequest;
+            core.setOutput("node_id", node.id);
+            core.setOutput("number", String(node.number));
+            core.setOutput("item_kind", node.__typename);
+
+      - name: Get Project ID + Fields
+        id: proj
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const org = process.env.ORG_LOGIN;
+            const projectNumber = parseInt(process.env.PROJECT_NUMBER || '0', 10);
+            if (!org || !projectNumber) {
+              core.setFailed("ORG_LOGIN and PROJECT_NUMBER must be set as Actions variables.");
+              return;
+            }
+            const FIELD_STATUS_NAME = process.env.FIELD_STATUS_NAME || 'Status';
+            const FIELD_TYPE_NAME = process.env.FIELD_TYPE_NAME || 'Type';
+            const FIELD_ITERATION_NAME = process.env.FIELD_ITERATION_NAME || 'Iteration';
+            const ownerType = (process.env.PROJECT_OWNER_TYPE || 'org').toLowerCase();
+
+            const common = `
+              projectV2(number:$number) {
+                id
+                fields(first: 50) {
+                  nodes {
+                    id
+                    name
+                    dataType
+                    ... on ProjectV2SingleSelectField { options { id name } }
+                    # Iteration field shape varies; we won't set it by default
+                  }
+                }
+              }
+            `;
+
+            const query = ownerType === 'user'
+              ? `query($login:String!, $number:Int!) { user(login:$login) { ${common} } }`
+              : `query($login:String!, $number:Int!) { organization(login:$login) { ${common} } }`;
+
+            const res = await github.graphql(query, { login: org, number: projectNumber });
+            const container = res.organization || res.user;
+            const proj = container?.projectV2;
+            if (!proj) {
+              core.setFailed(`Project ${projectNumber} not found under ${ownerType} ${org}`);
+              return;
+            }
+
+            function findField(name){
+              return proj.fields.nodes.find(f => (f.name || '').toLowerCase() === name.toLowerCase());
+            }
+
+            const statusField = findField(FIELD_STATUS_NAME);
+            const typeField = findField(FIELD_TYPE_NAME);
+            const iterField = findField(FIELD_ITERATION_NAME);
+
+            core.setOutput("project_id", proj.id);
+            core.setOutput("status_field_id", statusField?.id || "");
+            core.setOutput("type_field_id", typeField?.id || "");
+            core.setOutput("iter_field_id", iterField?.id || "");
+            core.setOutput("status_options", JSON.stringify(statusField?.options || []));
+            core.setOutput("type_options", JSON.stringify(typeField?.options || []));
+
+      - name: Ensure item is added to Project
+        id: add
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const projectId = '${{ steps.proj.outputs.project_id }}';
+            const contentId = '${{ steps.item.outputs.node_id }}';
+            if (!projectId || !contentId) {
+              core.setFailed('Missing projectId or contentId.');
+              return;
+            }
+            const addMutation = `
+              mutation($projectId:ID!, $contentId:ID!) {
+                addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}) {
+                  item { id }
+                }
+              }
+            `;
+            let itemId = null;
+            try {
+              const res = await github.graphql(addMutation, { projectId, contentId });
+              itemId = res.addProjectV2ItemById.item.id;
+            } catch (e) {
+              // Likely already exists — look it up
+              const lookup = `
+                query($contentId:ID!) {
+                  node(id:$contentId) {
+                    ... on Issue { projectItems(first:20) { nodes { id project { id } } } }
+                    ... on PullRequest { projectItems(first:20) { nodes { id project { id } } } }
+                  }
+                }
+              `;
+              const r = await github.graphql(lookup, { contentId });
+              const items = r.node?.projectItems?.nodes || [];
+              const found = items.find(pi => pi.project.id === projectId);
+              if (found) itemId = found.id;
+              else throw e;
+            }
+            core.setOutput('item_id', itemId);
+
+      - name: Derive Type/Status from labels and lifecycle
+        id: derive
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isIssue = !!context.payload.issue;
+            const action = context.payload.action || '';
+            const labels = (isIssue ? context.payload.issue.labels : context.payload.pull_request.labels) || [];
+            const lbls = labels.map(l => (typeof l === 'string' ? l : l.name)).map(s => String(s || '').toLowerCase());
+
+            // Type mapping
+            let type = '';
+            if (lbls.includes('feature')) type = 'Feature';
+            else if (lbls.includes('enabler')) type = 'Enabler';
+            else if (lbls.includes('spike')) type = 'Spike';
+            else if (lbls.includes('bug')) type = 'Bug';
+
+            // Status mapping
+            let status = 'Backlog';
+            if (lbls.includes('status:in-progress')) status = 'In Progress';
+            if (lbls.includes('status:review')) status = 'Review';
+            if (lbls.includes('status:done')) status = 'Done';
+            if (action === 'closed') status = 'Done';
+
+            core.setOutput('derived_type', type);
+            core.setOutput('derived_status', status);
+
+      - name: Update Project fields (Type / Status)
+        if: ${{ always() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const projectId = '${{ steps.proj.outputs.project_id }}';
+            const itemId = '${{ steps.add.outputs.item_id }}';
+            const statusFieldId = '${{ steps.proj.outputs.status_field_id }}';
+            const typeFieldId   = '${{ steps.proj.outputs.type_field_id }}';
+            const statusOptions = JSON.parse(`${{ toJson(steps.proj.outputs.status_options) }}` || '[]');
+            const typeOptions   = JSON.parse(`${{ toJson(steps.proj.outputs.type_options) }}` || '[]');
+            const statusName = '${{ steps.derive.outputs.derived_status }}';
+            const typeName   = '${{ steps.derive.outputs.derived_type }}';
+
+            if (!projectId || !itemId) {
+              core.info('Missing projectId or itemId, skipping field updates.');
+              return;
+            }
+
+            const updateMutation = `
+              mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $value:ProjectV2FieldValue!) {
+                updateProjectV2ItemFieldValue(input:{ projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:$value }) {
+                  projectV2Item { id }
+                }
+              }
+            `;
+
+            // Update Status
+            if (statusFieldId && statusName) {
+              const opt = statusOptions.find(o => (o.name || '') === statusName);
+              if (opt) {
+                await github.graphql(updateMutation, {
+                  projectId, itemId, fieldId: statusFieldId,
+                  value: { singleSelectOptionId: opt.id }
+                });
+                core.info(`Status set to ${statusName}`);
+              } else {
+                core.info(`Status option '${statusName}' not found; skipping.`);
+              }
+            }
+
+            // Update Type
+            if (typeFieldId && typeName) {
+              const opt = typeOptions.find(o => (o.name || '') === typeName);
+              if (opt) {
+                await github.graphql(updateMutation, {
+                  projectId, itemId, fieldId: typeFieldId,
+                  value: { singleSelectOptionId: opt.id }
+                });
+                core.info(`Type set to ${typeName}`);
+              } else {
+                core.info(`Type option '${typeName}' not found; skipping.`);
+              }
+            }
+
+      # Iteration setting intentionally omitted by default; enable only if you add logic to choose a valid iteration node id
+      # and set SET_ITERATION=true. The GraphQL API requires a concrete iterationId.
+

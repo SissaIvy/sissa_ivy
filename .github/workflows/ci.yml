@@ -39,6 +39,27 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_*.py' -v
 
+  cli-smoke:
+    name: CLI smoke (search flags)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Run CLI search with embedder flag
+        run: |
+          python memory_cli.py search EpisodicMemorySystem.json "episodic" --top-k 1 --threshold 0.0 --embedder hash
+
   smoke-faiss:
     name: Smoke (FAISS + NumPy) Python 3.11
     runs-on: ubuntu-latest

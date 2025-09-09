@@ -7,13 +7,13 @@ from fastapi import FastAPI, HTTPException
 import threading
 from pydantic import BaseModel
 
-from episodic_memory import MemoryStore, load_system_from_path
+from episodic_memory import MemoryStore, load_system_from_path, __version__ as PKG_VERSION
 from episodic_memory.models import EpisodicMemorySystem
 from episodic_memory.schema import load_schema, validate_instance
 from episodic_memory.embeddings import get_embedder, CachedEmbedder
 
 
-app = FastAPI(title="Episodic Memory Service", version="0.2.0rc1")
+app = FastAPI(title="Episodic Memory Service", version=PKG_VERSION)
 _EMBED_CONCURRENCY = int(os.getenv("EMBED_CONCURRENCY", "4"))
 _EMBED_SEM = threading.Semaphore(_EMBED_CONCURRENCY)
 

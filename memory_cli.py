@@ -55,7 +55,12 @@ def cmd_search(args: argparse.Namespace) -> int:
     store = MemoryStore.load(args.path)
     if args.threshold is not None:
         store.system.system_metadata.configuration.similarity_threshold = float(args.threshold)
-    results = store.search(args.query, top_k=args.top_k)
+    # Optional embedder for query parity with stored vectors
+    embedder = None
+    if getattr(args, "embedder", None):
+        base = get_embedder(args.embedder, model=args.openai_model)
+        embedder = CachedEmbedder(base, backend_name=args.embedder, model_id=args.openai_model)
+    results = store.search(args.query, top_k=args.top_k, embedder=embedder)
     if not results:
         print("No results above threshold.")
         return 0
@@ -279,6 +284,10 @@ def cmd_index_build(args: argparse.Namespace) -> int:
         if batch_ids:
             mgr.add_vectors(batch_ids, batch_vecs, batch_size=args.batch_size, sleep_ms=args.sleep_ms)
 
+        # Ensure parent directory exists for index output
+        out_dir = os.path.dirname(out_index or "")
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         mgr.save(out_index)
         print(f"Index built and saved to: {out_index}")
         return 0
@@ -358,6 +367,12 @@ def cmd_index_search(args: argparse.Namespace) -> int:
     dim = mgr.dim if hasattr(mgr, "dim") else (store.system.system_metadata.embedding_dimension if store else 0)
     qv = embedder.embed(args.query, dim)
     hits = mgr.search(qv, top_k=args.top_k)
+    # If max-distance is provided but using IP index, warn (option is ignored)
+    if getattr(args, "max_distance", None) is not None:
+        try:
+            print("Note: --max-distance is ignored for IP indexes (IndexFlatIP).", file=sys.stderr)
+        except Exception:
+            pass
     # Threshold filters (assumes IP metric; L2 not used in IndexFlatIP)
     if getattr(args, "min_score", None) is not None:
         try:
@@ -491,6 +506,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("query", help="Query text")
     s.add_argument("--top-k", type=int, default=5)
     s.add_argument("--threshold", type=float, default=None, help="Override similarity threshold for this search")
+    s.add_argument("--embedder", choices=["hash", "openai", "local"], default=None, help="Embedding backend for the query")
+    s.add_argument("--openai-model", default=None, help="OpenAI embedding model (if using openai)")
     s.set_defaults(func=cmd_search)
 
     a = sub.add_parser("add", help="Add a new memory entry")
@@ -502,7 +519,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--tone", default="neutral")
     a.add_argument("--location", default="")
     a.add_argument("--user-id", default="")
-    a.add_argument("--embedder", choices=["hash", "openai"], default=None, help="Embedding backend for this add")
+    a.add_argument("--embedder", choices=["hash", "openai", "local"], default=None, help="Embedding backend for this add")
     a.add_argument("--openai-model", default=None, help="OpenAI embedding model (if using openai)")
     a.add_argument("--embed-dim", type=int, default=None, help="Embedding dimension override")
     a.set_defaults(func=cmd_add)
@@ -517,7 +534,7 @@ def build_parser() -> argparse.ArgumentParser:
     fx.add_argument("--in-place", action="store_true", help="Write changes back to the same file")
     fx.add_argument("--output", default=None, help="Optional output path")
     fx.add_argument("--schema", nargs="?", const="auto", default=None, help="Schema validation after fix")
-    fx.add_argument("--embedder", choices=["hash", "openai"], default=None, help="Embedding backend for re-embedding")
+    fx.add_argument("--embedder", choices=["hash", "openai", "local"], default=None, help="Embedding backend for re-embedding")
     fx.add_argument("--openai-model", default=None, help="OpenAI embedding model (if using openai)")
     fx.add_argument("--embed-dim", type=int, default=None, help="Target embedding dimension for fix")
     fx.add_argument("--reembed", action="store_true", help="Force re-embedding all entries")

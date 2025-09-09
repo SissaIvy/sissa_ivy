@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "episodic-memory"
-version = "0.2.0rc1"
+version = "0.2.0"
 description = "Minimal, dependency-free episodic memory store with JSON loader and retrieval"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -27,6 +27,9 @@ episodic-memory = "memory_cli:main"
 
 [tool.setuptools.package-data]
 episodic_memory = ["py.typed", "schemas/*.json"]
+
+[tool.setuptools]
+packages = ["episodic_memory"]
 
 [project.optional-dependencies]
 openai = ["openai>=1.6.0"]

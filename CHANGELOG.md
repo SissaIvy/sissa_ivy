@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.0 (2025-09-09)
+
+Stabilization and UX improvements following rc1.
+
+Added
+- CLI: `search --embedder {hash,openai,local}` and `--openai-model`; threaded embedder to `MemoryStore.search` for correct query embedding.
+- Tests: CLI search flag coverage (`tests/test_cli_search_embedder_flag.py`).
+- CI: lightweight CLI smoke job validating search with `--embedder hash`.
+
+Changed
+- Packaging: constrain package discovery to `episodic_memory` for reliable editable installs.
+- FAISS index build: ensure output directory exists before saving index.
+- `index-search`: prints a warning when `--max-distance` is used with IP/cosine indexes.
+- Service version bumped to 0.2.0.
+
 ## v0.2.0rc1 (2025-09-08)
 
 Highlights

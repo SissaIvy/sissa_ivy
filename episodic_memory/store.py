@@ -316,11 +316,18 @@ class MemoryStore:
         self.rebuild_indexes()
 
     # --- Retrieval ---
-    def search(self, query_text: str, top_k: int | None = None) -> List[RetrievalResult]:
+    def search(self, query_text: str, top_k: int | None = None, *, embedder: Optional[object] = None) -> List[RetrievalResult]:
         sm = self.system.system_metadata
         cfg = sm.configuration
         dim = sm.embedding_dimension
-        q = _hash_embed(query_text, dim)
+        # Prefer caller-provided embedder (duck-typed with .embed), else built-in hash
+        if embedder is not None:
+            try:
+                q = embedder.embed(query_text, dim)  # type: ignore[attr-defined]
+            except Exception:
+                q = _hash_embed(query_text, dim)
+        else:
+            q = _hash_embed(query_text, dim)
         top_k = top_k or cfg.max_retrieval_results
 
         results: List[Tuple[str, float, float, float, str]] = []
