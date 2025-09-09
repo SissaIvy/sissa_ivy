@@ -1,41 +1,70 @@
-chore(license): add Apache-2.0 LICENSE/NOTICE and update packaging metadata
+feat(closed-loop): security orchestrator + tests/docs; AML battle-test + CI; cost/ROI knobs; submit-time gates
 
-Summary
-- Add Apache-2.0 LICENSE and NOTICE template.
-- Add README License section + badge.
-- Align packaging metadata: license file embedded in wheels/sdists; add OS Independent + OSI classifier; authors updated.
+## Summary
 
-Rationale
-- Make licensing explicit and machine-detectable for scanners and registries.
-- Keep legal/metadata changes isolated and auditable.
+Adds a closed-loop security orchestration component and supporting infra:
+- `closed_loop_security.py` — persona + overlay orchestration, explainable deterministic output.
+- AML artifacts: offline components, pipeline submit scripts, `README-aml`.
+- Cost/ROI and submit-time gates: in-run accounting, evaluator with tunable thresholds (cost / explainability / fail-rate / token-cost).
+- CI: new AML smoke job + FAISS smoke job; a path-scoped artifact upload step.
+- Governance: CODEOWNERS, labeler workflow, LICENSE/NOTICE, README license badge.
 
-Scope
-- Documentation + packaging only. No behavior change.
+This is primarily orchestration, CI and documentation + safety guardrails. No breaking API changes to existing CLI commands.
 
-Validation
-- Unit tests: python -m unittest discover -s tests -p "test_*.py" -v (green).
-- Build: python -m build (ok).
-- Twine check: python -m twine check dist/* (passed).
+## Highlights / Why it matters
 
-Follow-ups
-- Squash-merge to main.
-- Tag v0.2.1 “License alignment” to trigger release workflow.
-- (Optional) Set default branch to main and migrate to SPDX fields when upgrading setuptools.
+- Safety & cost control: submit-time gates let reviewers and infra enforce budget/explainability thresholds before compute-heavy runs.
+- Tested: unit + smoke tests for FAISS and closed-loop flow. 10/10 unit tests pass locally.
+- Production readiness: CI smoke jobs isolate heavy deps (FAISS/AML) to dedicated runners; meta persistence avoids repeated scans.
+- Governance: CODEOWNERS + labeler automates ownership and PR triage.
 
-Notes
-- CI checks: Lint and Test (Python 3.9/3.10/3.11), CLI smoke (search flags), Smoke (FAISS + NumPy) Python 3.11.
+## Changed / Added (high level)
+- `closed_loop_security.py` (core)
+- `tests/test_closed_loop.py`
+- `tests/test_faiss_cli_meta.py`, `tests/test_persist_meta_e2e.py`
+- `.github/workflows/ci.yml` (added: smoke-faiss, smoke-aml)
+- `episodic_memory/faiss_index.py`, `memory_cli.py` (index meta persistence & search)
+- `README.md` (ANN Index / Index Search flags, Allegory guides)
+- `README-aml`, AML submit scripts
+- `LICENSE`, `NOTICE`, packaging metadata updates, CODEOWNERS, labeler rules
 
-GH PR (Draft)
-Create draft PR from current feature branch:
-gh pr create --base main --head feat/faiss-smoke-tests --title "chore(license): add Apache-2.0 LICENSE/NOTICE and update packaging metadata" --body-file pr_body.md --draft
+## Validation
+- Unit tests: `python -m unittest discover -s tests -p "test_*.py"` — OK (10/10)
+- FAISS smoke tests: run under dedicated CI runner (Ubuntu, Python 3.11)
+- Build: `python -m build` — wheel/sdist generated
+- Twine: `python -m twine check dist/*` — passed
+- Local AML chain: evaluator gates and overrides exercised; cost accounting tested
 
-Or inline body (no file):
-gh pr create --base main --head feat/faiss-smoke-tests --title "chore(license): add Apache-2.0 LICENSE/NOTICE and update packaging metadata" --body "Adds Apache-2.0 LICENSE and NOTICE; README License section + badge; packaging embeds LICENSE and adds classifiers; no code changes." --draft
+## How to test locally (quick)
+1. Run unit tests (light):
+   `python -m unittest discover -s tests -p "test_*.py" -v`
+2. (Optional) FAISS smoke (requires faiss + numpy):
+   `pip install -e ".[faiss]" numpy pytest`
+   `pytest -k faiss_cli_meta -q`
+3. (Optional) AML smoke: follow `README-aml` instructions (offline components simulate workspace)
 
-Patch (private share)
-Full branch patch against main:
-git fetch origin && git format-patch origin/main..feat/faiss-smoke-tests --stdout > license-alignment.patch
+## CI notes
+- Normal unit tests run on PRs as before.
+- Heavy smoke jobs run on Ubuntu/Py3.11 runners and are path-scoped to avoid extra cost.
+- Labeler auto-applies `type:feature`, `area:security-orchestration`, `docs` when relevant files change.
 
-Single-commit patch (latest change):
-git format-patch -1 a65d9e1b3a82c793a531fcb6d43b96d439d624d9 --stdout > docs-badge-only.patch
+## Merge & Release plan
+- Merge: Squash & merge after CI green and review approvals.
+- Tag: after merge, create a patch release for closed-loop/AML features:
+```
+git checkout main && git pull
+git tag -a v0.2.2 -m "Closed-loop system, AML battle-test, CI guardrail, Cost/ROI knobs, submit-time gates"
+git push origin v0.2.2
+```
+(Release will be created by existing release workflow which reads CHANGELOG.)
 
+Reviewer checklist (copy for PR)
+- CI (unit + lint) green
+- smoke-faiss and smoke-aml jobs green on dedicated runners
+- Spot-check closed_loop_security.py for deterministic outputs and privacy (no secret logs)
+- README / AML docs adequate for oncall/runbook
+- Approve license/packaging metadata changes (legal signoff if required)
+
+Suggested reviewers & labels
+- Reviewers: infra/CI owner, security-owner, embeddings/FAISS owner
+- Labels: type:feature, area:security-orchestration, docs, ci
