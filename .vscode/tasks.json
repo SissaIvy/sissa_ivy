@@ -164,7 +164,7 @@
       "id": "labels",
       "description": "Enter comma-separated labels to add",
       "type": "promptString",
-      "default": "type:feature,area:security-orchestration,docs"
+      "default": "type:feature,area:closed-loop-security,docs"
     },
     {
       "id": "tagVersion",
@@ -180,4 +180,3 @@
     }
   ]
 }
-

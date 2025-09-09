@@ -1,4 +1,4 @@
-Episodic Memory System (Python)
+ClosedLoopSecuritySystem (Python)
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -41,7 +41,7 @@ Tests
 Packaging
 - Build/install locally:
   - `pip install -e .`
-  - CLI entrypoint: `episodic-memory` (mirrors `python memory_cli.py`)
+  - CLI entrypoint: `closed-loop-security` (mirrors `python memory_cli.py`)
 
 API Server
 - Install API extras: `pip install -e .[api]`
@@ -57,15 +57,15 @@ Programmatic Version
 
 ANN Index (FAISS)
 - Build from a single file:
-  - `episodic-memory index-build EpisodicMemorySystem.json index.faiss --sleep-ms 5`
+  - `closed-loop-security index-build EpisodicMemorySystem.json index.faiss --sleep-ms 5`
 - Build from a directory of JSON files:
-  - `episodic-memory index-build --data path/to/data/ --output indexes/faiss.index --batch-size 256 --sleep-ms 50`
+  - `closed-loop-security index-build --data path/to/data/ --output indexes/faiss.index --batch-size 256 --sleep-ms 50`
 - Search with a prebuilt index:
-  - `episodic-memory index-search indexes/faiss.index "episodic" --top-k 3`
+  - `closed-loop-security index-search indexes/faiss.index "episodic" --top-k 3`
   - Note: when indexing a directory, result IDs are `file.json::memory_id`. Snippets may be empty unless you look up the source file. Use `--data` to supply a meta file or directory for snippets.
 
 Index Search Flags & Behavior
-- `episodic-memory index-search <index> "<query>" [options]`
+- `closed-loop-security index-search <index> "<query>" [options]`
 
 - `--data <path>`: accepts either
   - path to a `<index>.meta.json` file (fast); or
@@ -81,13 +81,13 @@ Tip: When using IP/cosine indexes (e.g., IndexFlatIP), `--max-distance` is ignor
 Example (persist meta after resolving snippets from a data directory):
 
 ```bash
-episodic-memory index-search indexes/faiss.index "episodic" --top-k 5 --data path/to/data/ --persist-meta
+closed-loop-security index-search indexes/faiss.index "episodic" --top-k 5 --data path/to/data/ --persist-meta
 ```
 
 Example (filter by minimum score with normalized IP index):
 
 ```bash
-episodic-memory index-search indexes/faiss.index "episodic" --top-k 10 --min-score 0.2 --data path/to/data/
+closed-loop-security index-search indexes/faiss.index "episodic" --top-k 10 --min-score 0.2 --data path/to/data/
 ```
 
 Embedding Backends
