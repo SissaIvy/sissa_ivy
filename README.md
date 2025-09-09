@@ -131,3 +131,13 @@ This project is licensed under the [Apache 2.0 License](LICENSE).
 ## Suntari Allegory (Closed‑Loop SOC)
 - Guide: `docs/Suntari_Allegory_Closed_Loop_SOC.md`
 - Cast & Roles appendix: `docs/Suntari_Cast_and_Roles.md`
+
+### Cost & ROI knobs
+Runs can report blended per‑event cost, token cost, and ROI/ROE in their JSON outputs. Set env vars locally (or inject into Azure ML jobs). See `README-aml.md` → “Cost & ROI knobs”.
+
+Quick local example
+```bash
+export COST_APIM_MONTHLY=60 COST_EXPECTED_EVENTS_MONTH=100000
+python closed_loop_security.py --profile strict --events events.json
+```
+Inspect `meta.costs` and `meta.roi` in the output for per‑run budgets and savings.
