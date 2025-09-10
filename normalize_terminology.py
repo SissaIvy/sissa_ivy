@@ -32,8 +32,7 @@ DEFAULT_EXCLUDE_DIRS = {
 try:
     from terminology_normalizer import normalize  # type: ignore
     _IMPORT_ERROR: Optional[Exception] = None
-except Exception as e:  # noqa: BLE001
-    normalize = None  # type: ignore
+    normalize = None
     _IMPORT_ERROR = e
 
 
