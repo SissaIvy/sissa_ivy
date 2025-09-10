@@ -1,0 +1,25 @@
+name: Protect Main (require PitCrew)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  administration: write
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require PitCrew KPI check
+        uses: peter-evans/create-or-update-branch-protection-rule@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+          branch: main
+          required_status_checks: |
+            PitCrew KPI / mechanic
+          enforce_admins: true
+          require_up_to_date_branch: true

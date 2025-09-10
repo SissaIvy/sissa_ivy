@@ -43,3 +43,20 @@ Enable the timer with `systemctl enable --now cogsec-probe.timer`.
 
 Both probes can be executed or monitored by **Cribl Edge** as Exec sources to forward
 the JSON output into existing pipelines.
+
+### SISSA PitCrew — Live Status
+
+![status](badges/status.svg) ![kpi](badges/kpi.svg) ![xai](badges/xai.svg) ![failrate](badges/failrate.svg)
+
+![metrics](badges/metrics.svg)
+
+<details>
+<summary>More visuals</summary>
+
+![pit lanes](badges/metrics_pitlanes.svg)
+
+![redline stacks](badges/metrics_stacks.svg)
+
+![telemetry bars](badges/metrics_telemetry.svg)
+
+</details>
