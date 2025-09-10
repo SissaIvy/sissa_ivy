@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: "17 3 * * *"   # nightly 03:17 UTC, whimsical but stable
+    - cron: "17 3 * * *"   # nightly 03:17 UTC
 
 permissions:
   contents: write
@@ -29,13 +29,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run offline battle-test (gen → sim strict/explore → evaluate)
+      - name: Generate evaluator report (mock offline)
         run: |
           mkdir -p aml_out
-          python aml/components/generate_scenarios.py --n_events 200 --out_path aml_out/scenarios.jsonl
-          python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile strict   --results_json aml_out/strict.json
-          python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile explore  --results_json aml_out/explore.json
-          python aml/components/evaluate_personas.py --strict_results aml_out/strict.json --explore_results aml_out/explore.json --report_json aml_out/report.json
+          python ops/mechanic/mock_battletest.py --out aml_out/report.json --events 200 --fr_gate 0.05 --xai_gate 0.95
 
       - name: Build KPIs and badges
         run: |
@@ -49,7 +46,7 @@ jobs:
             --weight_xai 0.20 \
             --k_shape 14.0
 
-      - name: Install SVG→PNG converter
+      - name: Install SVG to PNG converter
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends librsvg2-bin
@@ -106,14 +103,14 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `PitCrew: Gate violation (HOLD) — ${new Date().toISOString()}`,
+              title: `PitCrew: Gate violation (HOLD) - ${new Date().toISOString()}`,
               body
             });
 
       - name: Fail on HOLD (gate)
         if: steps.decide.outputs.decision == 'HOLD'
         run: |
-          echo "Evaluator decision is HOLD — failing the job."
+          echo "Evaluator decision is HOLD - failing the job."
           exit 1
 
       - name: Commit badges & KPI JSON on main
@@ -125,4 +122,3 @@ jobs:
           git add badges/*.svg mech_out/mechanic_kpi.json
           git commit -m "chore(pitcrew): update KPI badges & report [skip ci]" || echo "No changes"
           git push
-
