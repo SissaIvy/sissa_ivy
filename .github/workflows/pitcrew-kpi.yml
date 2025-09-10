@@ -1,0 +1,459 @@
+name: PitCrew KPI
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: "17 3 * * *"   # nightly 03:17 UTC, whimsical but stable
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  mechanic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run offline battle-test (gen → sim strict/explore → evaluate)
+        run: |
+          mkdir -p aml_out
+          python aml/components/generate_scenarios.py --n_events 200 --out_path aml_out/scenarios.jsonl
+          python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile strict   --results_json aml_out/strict.json
+          python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile explore  --results_json aml_out/explore.json
+          python aml/components/evaluate_personas.py --strict_results aml_out/strict.json --explore_results aml_out/explore.json --report_json aml_out/report.json
+
+      - name: Build KPIs and badges
+        run: |
+          python ops/mechanic/kpi_collect.py --report aml_out/report.json --out_dir mech_out --badges_dir badges
+
+      - name: Install SVG→PNG converter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+
+      - name: Create PNG thumbnails
+        run: |
+          rsvg-convert -w 720 -h 236 mech_out/metrics_pitlanes.svg   -o mech_out/metrics_pitlanes.png
+          rsvg-convert -w 420 -h 160 mech_out/metrics_stacks.svg     -o mech_out/metrics_stacks.png
+          rsvg-convert -w 420 -h 160 mech_out/metrics_telemetry.svg  -o mech_out/metrics_telemetry.png
+
+      - name: Upload artifacts (for inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcrew-artifacts
+          path: |
+            aml_out/report.json
+            mech_out/*
+            badges/*
+
+      - name: Add PR job summary
+        if: github.event_name == 'pull_request'
+        run: |
+          cat mech_out/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Add PNG thumbnails to summary
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "\n<details><summary>Static thumbnails (PNG)</summary>\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Pit Lanes\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"pit-lanes\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_pitlanes.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Redline Stacks\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"redline-stacks\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_stacks.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Telemetry Bars\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"telemetry-bars\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_telemetry.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n</details>\n" >> "$GITHUB_STEP_SUMMARY"
+
+      - id: decide
+        name: Read decision
+        run: |
+          python - <<'PY' >> $GITHUB_OUTPUT
+          import json
+          d=json.load(open('mech_out/mechanic_kpi.json'))
+          print(f"decision={d['decision']}")
+          print(f"overall={d['overall_kpi']}")
+          PY
+
+      - name: Open regression issue on HOLD
+        if: steps.decide.outputs.decision == 'HOLD'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('mech_out/summary.md', 'utf8');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `PitCrew: Gate violation (HOLD) — ${new Date().toISOString()}`,
+              body
+            });
+
+      - name: Fail on HOLD (gate)
+        if: steps.decide.outputs.decision == 'HOLD'
+        run: |
+          echo "Evaluator decision is HOLD — failing the job."
+          exit 1
+
+      - name: Commit badges & KPI JSON on main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name  "sissa-pitcrew[bot]"
+          git config user.email "actions@github.com"
+          git add badges/*.svg mech_out/mechanic_kpi.json
+          git commit -m "chore(pitcrew): update KPI badges & report [skip ci]" || echo "No changes"
+          git push
+name: PitCrew KPI
+
+concurrency:
+  group: pitcrew-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  mechanic:
+    name: PitCrew KPI / mechanic
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate report (real AML if present, else mock)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p aml_out
+          if [[ -n "$(git ls-files aml/components/evaluate_personas.py)" ]]; then
+            echo "AML components found — running real offline chain"
+            python aml/components/generate_scenarios.py --n_events 200 --out_path aml_out/scenarios.jsonl
+            python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile strict  --results_json aml_out/strict.json
+            python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile explore --results_json aml_out/explore.json
+            python aml/components/evaluate_personas.py --strict_results aml_out/strict.json --explore_results aml_out/explore.json --report_json aml_out/report.json
+          else
+            echo "AML components missing — using deterministic mock"
+            python ops/mechanic/mock_battletest.py \
+              --out aml_out/report.json \
+              --events 200 \
+              --fr_gate_strict 0.05 --fr_gate_explore 0.05 --xai_gate 0.95 \
+              --fr_s_mean 0.020 --fr_e_mean 0.035 --xai_s_mean 0.970 --xai_e_mean 0.960 \
+              --fr_sd 0.010 --xai_sd 0.020 --rho -0.55 --seed 42
+          fi
+
+      - name: Build KPIs and badges
+        run: |
+          python ops/mechanic/kpi_collect.py \
+            --report aml_out/report.json \
+            --fr_gate 0.05 \
+            --xai_gate 0.95 \
+            --weight_rel 0.80 \
+            --weight_xai 0.20 \
+            --k_shape 14.0
+
+      - name: Closed-loop security evaluation (strict/explore)
+        run: |
+          python ops/mechanic/security_bridge.py --out aml_out/security_report.json --events 200 --fr_gate_strict 0.05 --fr_gate_explore 0.05 --xai_gate 0.95
+          python ops/mechanic/kpi_collect.py \
+            --report aml_out/security_report.json \
+            --out_dir mech_out_sec \
+            --badges_dir badges/security \
+            --fr_gate 0.05 --xai_gate 0.95 --weight_rel 0.80 --weight_xai 0.20 --k_shape 14.0
+
+      - name: Install SVG to PNG converter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+
+      - name: Create PNG thumbnails
+        run: |
+          rsvg-convert -w 720 -h 236 mech_out/metrics_pitlanes.svg   -o mech_out/metrics_pitlanes.png
+          rsvg-convert -w 420 -h 160 mech_out/metrics_stacks.svg     -o mech_out/metrics_stacks.png
+          rsvg-convert -w 420 -h 160 mech_out/metrics_telemetry.svg  -o mech_out/metrics_telemetry.png
+
+      - name: Upload artifacts (for inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcrew-artifacts
+          path: |
+            aml_out/report.json
+            aml_out/security_report.json
+            mech_out/*
+            mech_out_sec/*
+            badges/*
+            badges/security/*
+
+      - name: Add PR job summary
+        if: github.event_name == 'pull_request'
+        run: |
+          cat mech_out/summary.md >> "$GITHUB_STEP_SUMMARY"
+          # If summary.md contains inline SVGs, they're included above. PNGs below are fallbacks.
+
+      - name: Add PNG thumbnails to summary
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "\n<details><summary>Static thumbnails (PNG)</summary>\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Pit Lanes\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"pit-lanes\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_pitlanes.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Redline Stacks\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"redline-stacks\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_stacks.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Telemetry Bars\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"telemetry-bars\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_telemetry.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n</details>\n" >> "$GITHUB_STEP_SUMMARY"
+
+      - id: decide
+        name: Read decision
+        run: |
+          python - <<'PY' >> $GITHUB_OUTPUT
+          import json
+          d=json.load(open('mech_out/mechanic_kpi.json'))
+          print(f"decision={d['decision']}")
+          print(f"overall={d['overall_kpi']}")
+          PY
+
+      - name: Open regression issue on HOLD
+        if: steps.decide.outputs.decision == 'HOLD'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('mech_out/summary.md', 'utf8');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `PitCrew: Gate violation (HOLD) - ${new Date().toISOString()}`,
+              body
+            });
+
+      - name: Fail on HOLD (gate)
+        if: steps.decide.outputs.decision == 'HOLD'
+        run: |
+          echo "Evaluator decision is HOLD - failing the job."
+          exit 1
+
+      - name: Commit badges & KPI JSON on main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name  "sissa-pitcrew[bot]"
+          git config user.email "actions@github.com"
+          git pull --rebase --autostash || true
+          git add badges/*.svg badges/security/*.svg mech_out/mechanic_kpi.json mech_out_sec/mechanic_kpi.json
+          git commit -m "chore(pitcrew): update KPI badges & report [skip ci]" || echo "No changes"
+          git push
+
+  hold_drill:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Generate HOLD report via mock
+        run: |
+          mkdir -p aml_out
+          python ops/mechanic/mock_battletest.py \
+            --out aml_out/report.json --events 200 \
+            --fr_gate_strict 0.05 --fr_gate_explore 0.05 --xai_gate 0.95 \
+            --fr_s_mean 0.020 --fr_e_mean 0.040 --xai_s_mean 0.955 --xai_e_mean 0.900 \
+            --fr_sd 0.005 --xai_sd 0.010 --rho -0.60 --seed 7
+      - name: Build KPIs
+        run: |
+          python ops/mechanic/kpi_collect.py --report aml_out/report.json --fr_gate 0.05 --xai_gate 0.95
+      - name: Expect HOLD (sanity)
+        run: |
+          python - <<'PY'
+          import json; d=json.load(open('mech_out/mechanic_kpi.json'))
+          assert d['decision']=='HOLD', f"Expected HOLD, got {d['decision']}"
+          print('HOLD drill passed (gate active).')
+          PY
+name: PitCrew KPI
+
+concurrency:
+  group: pitcrew-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  mechanic:
+    name: PitCrew KPI / mechanic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate report (real AML if present, else mock)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p aml_out
+          if [[ -n "$(git ls-files aml/components/evaluate_personas.py)" ]]; then
+            echo "AML components found — running real offline chain"
+            python aml/components/generate_scenarios.py --n_events 200 --out_path aml_out/scenarios.jsonl
+            python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile strict  --results_json aml_out/strict.json
+            python aml/components/simulate_closed_loop.py --scenarios aml_out/scenarios.jsonl --profile explore --results_json aml_out/explore.json
+            python aml/components/evaluate_personas.py --strict_results aml_out/strict.json --explore_results aml_out/explore.json --report_json aml_out/report.json
+          else
+            echo "AML components missing — using deterministic mock"
+            python ops/mechanic/mock_battletest.py \
+              --out aml_out/report.json \
+              --events 200 \
+              --fr_gate_strict 0.05 --fr_gate_explore 0.05 --xai_gate 0.95 \
+              --fr_s_mean 0.020 --fr_e_mean 0.035 --xai_s_mean 0.970 --xai_e_mean 0.960 \
+              --fr_sd 0.010 --xai_sd 0.020 --rho -0.55 --seed 42
+          fi
+
+      - name: Build KPIs and badges
+        run: |
+          python ops/mechanic/kpi_collect.py \
+            --report aml_out/report.json \
+            --fr_gate 0.05 \
+            --xai_gate 0.95 \
+            --weight_rel 0.80 \
+            --weight_xai 0.20 \
+            --k_shape 14.0
+
+      - name: Closed-loop security evaluation (strict/explore)
+        run: |
+          python ops/mechanic/security_bridge.py --out aml_out/security_report.json --events 200 --fr_gate_strict 0.05 --fr_gate_explore 0.05 --xai_gate 0.95
+          python ops/mechanic/kpi_collect.py \
+            --report aml_out/security_report.json \
+            --out_dir mech_out_sec \
+            --badges_dir badges/security \
+            --fr_gate 0.05 --xai_gate 0.95 --weight_rel 0.80 --weight_xai 0.20 --k_shape 14.0
+
+      - name: Install SVG to PNG converter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+
+      - name: Create PNG thumbnails
+        run: |
+          rsvg-convert -w 720 -h 236 mech_out/metrics_pitlanes.svg   -o mech_out/metrics_pitlanes.png
+          rsvg-convert -w 420 -h 160 mech_out/metrics_stacks.svg     -o mech_out/metrics_stacks.png
+          rsvg-convert -w 420 -h 160 mech_out/metrics_telemetry.svg  -o mech_out/metrics_telemetry.png
+
+      - name: Upload artifacts (for inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitcrew-artifacts
+          path: |
+            aml_out/report.json
+            aml_out/security_report.json
+            mech_out/*
+            mech_out_sec/*
+            badges/*
+            badges/security/*
+
+      - name: Add PR job summary
+        if: github.event_name == 'pull_request'
+        run: |
+          cat mech_out/summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo "\n<details><summary>Static thumbnails (PNG)</summary>\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Pit Lanes\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"pit-lanes\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_pitlanes.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Redline Stacks\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"redline-stacks\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_stacks.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n#### Telemetry Bars\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "<img alt=\"telemetry-bars\" src=\"data:image/png;base64,$(base64 -w0 mech_out/metrics_telemetry.png)\" />\n" >> "$GITHUB_STEP_SUMMARY"
+          echo "\n</details>\n" >> "$GITHUB_STEP_SUMMARY"
+
+      - id: decide
+        name: Read decision
+        run: |
+          python - <<'PY' >> $GITHUB_OUTPUT
+          import json
+          d=json.load(open('mech_out/mechanic_kpi.json'))
+          print(f"decision={d['decision']}")
+          print(f"overall={d['overall_kpi']}")
+          PY
+
+      - name: Open regression issue on HOLD
+        if: steps.decide.outputs.decision == 'HOLD'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('mech_out/summary.md', 'utf8');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `PitCrew: Gate violation (HOLD) - ${new Date().toISOString()}`,
+              body
+            });
+
+      - name: Fail on HOLD (gate)
+        if: steps.decide.outputs.decision == 'HOLD'
+        run: |
+          echo "Evaluator decision is HOLD - failing the job."
+          exit 1
+
+      - name: Commit badges & KPI JSON on main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name  "sissa-pitcrew[bot]"
+          git config user.email "actions@github.com"
+          git pull --rebase --autostash || true
+          git add badges/*.svg badges/security/*.svg mech_out/mechanic_kpi.json mech_out_sec/mechanic_kpi.json
+          git commit -m "chore(pitcrew): update KPI badges & report [skip ci]" || echo "No changes"
+          git push
+
+  hold_drill:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Generate HOLD report via mock
+        run: |
+          mkdir -p aml_out
+          python ops/mechanic/mock_battletest.py \
+            --out aml_out/report.json --events 200 \
+            --fr_gate_strict 0.05 --fr_gate_explore 0.05 --xai_gate 0.95 \
+            --fr_s_mean 0.020 --fr_e_mean 0.040 --xai_s_mean 0.955 --xai_e_mean 0.900 \
+            --fr_sd 0.005 --xai_sd 0.010 --rho -0.60 --seed 7
+      - name: Build KPIs
+        run: |
+          python ops/mechanic/kpi_collect.py --report aml_out/report.json --fr_gate 0.05 --xai_gate 0.95
+      - name: Expect HOLD (sanity)
+        run: |
+          python - <<'PY'
+          import json; d=json.load(open('mech_out/mechanic_kpi.json'))
+          assert d['decision']=='HOLD', f"Expected HOLD, got {d['decision']}"
+          print('HOLD drill passed (gate active).')
+          PY

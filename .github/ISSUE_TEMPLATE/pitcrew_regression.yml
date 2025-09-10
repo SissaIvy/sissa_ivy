@@ -1,0 +1,21 @@
+name: PitCrew Gate Violation
+description: Created automatically when evaluator decision is HOLD
+title: "PitCrew: Gate violation — <auto>"
+labels: ["pitcrew", "regression", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue was opened because a PitCrew run reported **HOLD**.
+        Review the summary below and link the fixing PR.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary (paste from job summary if needed)
+      description: Key numbers and hypotheses
+  - type: input
+    id: link
+    attributes:
+      label: Build URL
+      description: Link to the failed CI run
+

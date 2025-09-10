@@ -1,0 +1,39 @@
+name: Protect Main (require PitCrew)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  administration: write
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark required check via gh (requires REPO_ADMIN_TOKEN)
+        if: secrets.REPO_ADMIN_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
+        run: |
+          gh api -X PUT \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/branches/main/protection \
+            -f required_status_checks.strict=true \
+            -f required_status_checks.contexts[]="PitCrew KPI / mechanic" \
+            -f enforce_admins=true \
+            -f required_pull_request_reviews.required_approving_review_count=1 \
+            -F restrictions=
+
+      - name: Require PitCrew KPI check
+        uses: peter-evans/create-or-update-branch-protection-rule@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+          branch: main
+          required_status_checks: |
+            PitCrew KPI / mechanic
+          enforce_admins: true
+          require_up_to_date_branch: true
