@@ -45,6 +45,11 @@ jobs:
         working-directory: ui/pitcrew-dashboard
         run: npm run build
 
+      - name: Add CNAME (custom domain)
+        if: ${{ secrets.PAGES_CUSTOM_DOMAIN != '' }}
+        run: |
+          echo "${{ secrets.PAGES_CUSTOM_DOMAIN }}" | tee ui/pitcrew-dashboard/dist/CNAME
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
