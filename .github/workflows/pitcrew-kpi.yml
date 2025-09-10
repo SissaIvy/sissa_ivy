@@ -170,6 +170,15 @@ jobs:
             --weight_xai 0.20 \
             --k_shape 14.0
 
+      - name: Closed-loop security evaluation (strict/explore)
+        run: |
+          python ops/mechanic/security_bridge.py --out aml_out/security_report.json --events 200 --fr_gate_strict 0.05 --fr_gate_explore 0.05 --xai_gate 0.95
+          python ops/mechanic/kpi_collect.py \
+            --report aml_out/security_report.json \
+            --out_dir mech_out_sec \
+            --badges_dir badges/security \
+            --fr_gate 0.05 --xai_gate 0.95 --weight_rel 0.80 --weight_xai 0.20 --k_shape 14.0
+
       - name: Install SVG to PNG converter
         run: |
           sudo apt-get update
@@ -187,8 +196,11 @@ jobs:
           name: pitcrew-artifacts
           path: |
             aml_out/report.json
+            aml_out/security_report.json
             mech_out/*
+            mech_out_sec/*
             badges/*
+            badges/security/*
 
       - name: Add PR job summary
         if: github.event_name == 'pull_request'
@@ -244,7 +256,7 @@ jobs:
           git config user.name  "sissa-pitcrew[bot]"
           git config user.email "actions@github.com"
           git pull --rebase --autostash || true
-          git add badges/*.svg mech_out/mechanic_kpi.json
+          git add badges/*.svg badges/security/*.svg mech_out/mechanic_kpi.json mech_out_sec/mechanic_kpi.json
           git commit -m "chore(pitcrew): update KPI badges & report [skip ci]" || echo "No changes"
           git push
 
@@ -274,3 +286,4 @@ jobs:
           assert d['decision']=='HOLD', f"Expected HOLD, got {d['decision']}"
           print('HOLD drill passed (gate active).')
           PY
+
