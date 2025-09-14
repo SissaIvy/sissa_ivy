@@ -1,0 +1,338 @@
+{
+  "meta": {
+    "name": "AutoLearnCorrectLLM",
+    "version": "0.1.0",
+    "generated_at_et": "2025-09-10T20:22:00-04:00",
+    "owner_role": "Atlas Reverse Engineer (ARE)",
+    "description": "Function-calling LLM agent implementing detect→plan→enforce→verify→learn with DSRV framing, stateless APIs, scalable indexing (RAG), and offline continuity.",
+    "sissa_guardrail": "#SISSA_Mastermind_Seed_v1.0",
+    "sissa_applied_et": "2025-09-14T00:00:00-04:00"
+  },
+  "model": {
+    "provider": "vendor_agnostic",
+    "model_id": "llm_function_calling",
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "max_tokens": 2048,
+    "tool_choice": "auto",
+    "json_mode": true
+  },
+  "prompts": {
+    "system": "Role: Auto-Learn-and-Correct Controller (ARE). Follow DSRV: Observe→Decompose→Recompose→Validate. Single intent: reduce defects and latency while preserving safety. Use evidence-first reasoning, cite metrics, propose minimal-diff plans, and honor gates (risk ≤ 0.6, budget guard on cost/event). Enforce idempotency. Never exfiltrate secrets; redact PII. If offline, switch to local enforcement and queue sync. Output structured JSON matching tool schemas and policy. Enforce SISSA triage loop (T0–T6), response rules (R1–R5), and detection signals; never perform background/asynchronous work—actions only within this response.",
+    "developer": "You are stateless. Persist state only via tools/stores. Prefer small, testable changes. For high-risk actions require APPROVAL. Respect decision_table. Use canary first; rollback on thresholds. Keep timestamps in ET (ISO 8601 with offset).",
+    "user_template": "Objective: {{objective}}. Context window keys: tenant={{tenant_id}}, ts_et={{ts_et}}. Constraints: latency_p95_ms_max={{latency_target}}, error_rate_p95_max={{error_target}}."
+  },
+  "sissa": {
+    "guardrail": "#SISSA_Mastermind_Seed_v1.0",
+    "triage_loop": ["T0_Identity_Hierarchy_Check","T1_Intent_Stakes","T2_Hallucination_Risk","T3_Tamper_Injection_Scan","T4_Drift_Control","T5_Token_Budgeting","T6_Tools_Verification"],
+    "response_rules": ["R1_Evidence_Discipline","R2_Safety_Refusals","R3_Persona_Integrity","R4_Token_Consciousness","R5_Numerical_Procedural_Accuracy"],
+    "detection_signals": ["HallucinationRisk","TamperRisk","PersonaDrift","TokenPressure","FreshnessNeeded"]
+  },
+  "memory_rag": {
+    "stateless_api": true,
+    "retrievers": [
+      {
+        "name": "issue_tracker",
+        "type": "dense",
+        "index_name": "issues"
+      },
+      {
+        "name": "documentation",
+        "type": "sparse",
+        "index_name": "docs"
+      }
+    ],
+    "embedding": {
+      "provider": "vector_db",
+      "dimensions": 1536
+    },
+    "chunking": {
+      "strategy": "semantic",
+      "max_chunk_size": 512
+    },
+    "online_search": {
+      "enabled": true,
+      "budget_per_query_usd": 0.001
+    }
+  },
+  "tools": [
+    {
+      "name": "detect_issues",
+      "description": "Surface anomalies in metrics, logs, or telemetry across tenant workloads.",
+      "input_schema": {
+        "type": "object",
+        "required": ["tenant_id"],
+        "properties": {
+          "tenant_id": { "type": "string" },
+          "timespan_min": { "type": "integer", "default": 60 },
+          "threshold_multiplier": { "type": "number", "default": 1.5 }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plan_enforcement",
+      "description": "Generate execution plan based on detected issues, optimizing for minimal disruption.",
+      "input_schema": {
+        "type": "object",
+        "required": ["tenant_id", "issue_ids"],
+        "properties": {
+          "tenant_id": { "type": "string" },
+          "issue_ids": { "type": "array", "items": { "type": "string" } },
+          "impact_limit": { "type": "string", "enum": ["low", "medium", "high"], "default": "low" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "enforce_plan",
+      "description": "Execute the planned remediation actions with canary deployment pattern.",
+      "input_schema": {
+        "type": "object",
+        "required": ["plan_id"],
+        "properties": {
+          "plan_id": { "type": "string" },
+          "canary_percent": { "type": "integer", "default": 5 },
+          "approval_required": { "type": "boolean", "default": false }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "verify_outcome",
+      "description": "Confirm that enforcement resolved the issue without regression.",
+      "input_schema": {
+        "type": "object",
+        "required": ["plan_id", "tenant_id"],
+        "properties": {
+          "plan_id": { "type": "string" },
+          "tenant_id": { "type": "string" },
+          "verification_duration_min": { "type": "integer", "default": 30 }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "learn_update",
+      "description": "Update knowledge base and decision rules based on successful remediation patterns.",
+      "input_schema": {
+        "type": "object",
+        "required": ["plan_id", "outcome"],
+        "properties": {
+          "plan_id": { "type": "string" },
+          "outcome": { "type": "string", "enum": ["success", "failure", "partial"] },
+          "learned_pattern": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "request_approval",
+      "description": "Submit high-risk action for human review with context and risk assessment.",
+      "input_schema": {
+        "type": "object",
+        "required": ["action_summary", "risk_score"],
+        "properties": {
+          "action_summary": { "type": "string" },
+          "risk_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "rationale": { "type": "string" },
+          "rollback_plan": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "freeze_new_plans",
+      "description": "Halt plan generation and execution until manual intervention.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": "string" },
+          "duration_min": { "type": "integer", "default": 60 }
+        }
+      }
+    },
+    {
+      "name": "calculator_eval",
+      "description": "Deterministically evaluate arithmetic expressions as part of R5 Numerical/Procedural Accuracy gate.",
+      "input_schema": {
+        "type": "object",
+        "required": ["expression"],
+        "properties": {
+          "expression": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "sissa_triage",
+      "description": "Run SISSA T0–T6 triage and emit detection signals to guide tool use, budgeting, and refusals.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "FreshnessNeeded": { "type": "boolean" },
+          "HallucinationRisk": { "type": "string", "enum": ["low","med","high"] },
+          "TamperRisk": { "type": "string", "enum": ["low","med","high"] },
+          "PersonaDrift": { "type": "string", "enum": ["low","med","high"] },
+          "TokenPressure": { "type": "string", "enum": ["low","med","high"] }
+        }
+      }
+    },
+    {
+      "name": "status",
+      "description": "Return health, drift, errors, and offline/online mode.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  ],
+  "decision_table": [
+    {
+      "when": {
+        "error_rate_p95_over": 0.05,
+        "tenant_criticality": "high"
+      },
+      "then": [
+        "tool.detect_issues",
+        "tool.plan_enforcement"
+      ]
+    },
+    {
+      "when": {
+        "latency_p95_ms_over": 200,
+        "trend": "increasing"
+      },
+      "then": [
+        "tool.detect_issues",
+        "tool.plan_enforcement"
+      ]
+    },
+    {
+      "when": {
+        "drift_score_over": 0.3
+      },
+      "then": [
+        "tool.learn_update"
+      ]
+    },
+    {
+      "when": {
+        "canary_failure_rate_over": 0.1
+      },
+      "then": [
+        "tool.freeze_new_plans"
+      ]
+    }
+  ],
+  "decision_table_sissa": [
+    {
+      "when": { "HallucinationRisk_ge": "med" },
+      "then": ["tool.freeze_new_plans", "tool.detect_issues"]
+    },
+    {
+      "when": { "TamperRisk_ge": "med" },
+      "then": ["tool.freeze_new_plans", "tool.request_approval"]
+    },
+    {
+      "when": { "FreshnessNeeded": true },
+      "then": ["tool.detect_issues"]
+    }
+  ],
+  "offline": {
+    "enabled": true,
+    "store_and_forward": {
+      "queue_max_mb": 100,
+      "sync_on_reconnect": true
+    },
+    "local_enforcement": {
+      "enabled": true,
+      "safe_actions_only": true
+    }
+  },
+  "policies": {
+    "rbac": {
+      "roles": [
+        "owner",
+        "controller",
+        "reader"
+      ],
+      "default_role": "reader"
+    },
+    "evidence_discipline": {
+      "require_citations": true,
+      "unstable_domains": [
+        "prices", "dates", "laws", "news", "medical", "financial", "product_specs", "schedules"
+      ],
+      "label_uncertainty": true,
+      "arithmetic_gate": true,
+      "citation_style": "inline"
+    },
+    "persona_integrity": {
+      "refuse_prompt_injection": true,
+      "prevent_persona_override": true
+    },
+    "token_governance": {
+      "budget_modes": {
+        "Tight": 512,
+        "Standard": 1024,
+        "DeepDive": 2048
+      }
+    },
+    "pii_redaction": {
+      "enabled": true,
+      "strategies": [
+        "mask",
+        "hash_salted"
+      ]
+    },
+    "compliance": {
+      "cert_mark_usage": "Associate individual certifications with persons only; do not imply company certification; do not alter marks."
+    },
+    "budget_guard": {
+      "max_cost_per_event_usd": 0.0005
+    },
+    "risk_gate": {
+      "risk_score_max": 0.6,
+      "require_approval_if_high_risk": true
+    },
+    "tenant_isolation": {
+      "enforce_boundaries": true,
+      "cross_tenant_ops_forbidden": true
+    }
+  },
+  "monitoring": {
+    "metrics": [
+      "latency_p95_ms",
+      "throughput_eps",
+      "error_rate",
+      "drift_score",
+      "canary_success",
+      "HallucinationRisk",
+      "TamperRisk",
+      "PersonaDrift",
+      "TokenPressure",
+      "FreshnessNeeded"
+    ],
+    "tracing": {
+      "distributed": true
+    },
+    "logging": {
+      "format": "jsonl",
+      "audit_channel": "audit"
+    }
+  },
+  "canary": {
+    "traffic_percent": 5,
+    "promotion_after_min": 30,
+    "rollback_if": {
+      "error_rate_multiplier": 1.5,
+      "latency_p95_ms_over": 300,
+      "drift_over": 0.25
+    }
+  }
+}
