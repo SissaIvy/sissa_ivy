@@ -6,14 +6,14 @@ optionally append a CSV line that matches the `cogsec_workflow.py` health schema
 
 ## Collectors
 
-### Windows: `Get-CogSecEndpointState.ps1`
+### Windows: `collectors/windows/probe_windows.ps1`
 
 * Queries WMI/CIM, registry, performance counters and Defender cmdlets.
 * Outputs one JSON record per run and can append a health CSV line.
 * Example scheduled task (every 5 minutes):
 
 ```powershell
-$script = "C:\cogsec\Get-CogSecEndpointState.ps1"
+$script = "C:\cogsec\collectors\windows\probe_windows.ps1"
 $csv    = "C:\cogsec\health_metrics.csv"
 $log    = "C:\cogsec\state.json"
 schtasks /Create /SC MINUTE /MO 5 /TN "CogSec Probe" `
@@ -21,7 +21,7 @@ schtasks /Create /SC MINUTE /MO 5 /TN "CogSec Probe" `
   /RU "SYSTEM" /RL HIGHEST /F
 ```
 
-### Linux: `cogsec_probe_linux.py`
+### Linux: `collectors/linux/probe_linux.py`
 
 * Reads `/proc`, package/firewall status, listening ports and AV services.
 * Prints a JSON record to stdout; make it executable and schedule via systemd:
@@ -30,7 +30,7 @@ schtasks /Create /SC MINUTE /MO 5 /TN "CogSec Probe" `
 # /etc/systemd/system/cogsec-probe.service
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /opt/cogsec/collectors/cogsec_probe_linux.py | tee /opt/cogsec/state.json
+ExecStart=/usr/bin/python3 /opt/cogsec/collectors/linux/probe_linux.py | tee /opt/cogsec/state.json
 
 # /etc/systemd/system/cogsec-probe.timer
 [Timer]
