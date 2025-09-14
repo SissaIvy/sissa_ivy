@@ -12,7 +12,7 @@ def main() -> None:
     """Pretty-print the AutoLearnCorrectLLM specification."""
     with SPEC_PATH.open("r", encoding="utf-8") as f:
         spec = json.load(f)
-    json.dump(spec, sys.stdout, indent=2)
+    json.dump(spec, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
 
 
