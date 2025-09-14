@@ -43,3 +43,13 @@ Enable the timer with `systemctl enable --now cogsec-probe.timer`.
 
 Both probes can be executed or monitored by **Cribl Edge** as Exec sources to forward
 the JSON output into existing pipelines.
+
+## AutoLearnCorrectLLM
+
+The repository includes the `AutoLearnCorrectLLM` specification at
+`archetypes/auto_learn_correct.llm.v0.1.0.json`. View the spec using the
+provided helper:
+
+```bash
+python -m archetypes.auto_learn_correct_llm
+```
