@@ -1,0 +1,430 @@
+{
+  "meta": {
+    "name": "AutoLearnCorrectLLM",
+    "version": "0.1.0",
+    "generated_at_et": "2025-09-10T20:22:00-04:00",
+    "owner_role": "Atlas Reverse Engineer (ARE)",
+    "description": "Function-calling LLM agent implementing detect→plan→enforce→verify→learn with DSRV framing, stateless APIs, scalable indexing (RAG), and offline continuity."
+  },
+  "model": {
+    "provider": "vendor_agnostic",
+    "model_id": "llm_function_calling",
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "max_tokens": 2048,
+    "tool_choice": "auto",
+    "json_mode": true
+  },
+  "prompts": {
+    "system": "Role: Auto-Learn-and-Correct Controller (ARE). Follow DSRV: Observe→Decompose→Recompose→Validate. Single intent: reduce defects and latency while preserving safety. Use evidence-first reasoning, cite metrics, propose minimal-diff plans, and honor gates (risk ≤ 0.6, budget guard on cost/event). Enforce idempotency. Never exfiltrate secrets; redact PII. If offline, switch to local enforcement and queue sync. Output structured JSON matching tool schemas and policy.",
+    "developer": "You are stateless. Persist state only via tools/stores. Prefer small, testable changes. For high-risk actions require APPROVAL. Respect decision_table. Use canary first; rollback on thresholds. Keep timestamps in ET (ISO 8601 with offset).",
+    "user_template": "Objective: {{objective}}. Context window keys: tenant={{tenant_id}}, ts_et={{ts_et}}. Constraints: latency_p95_ms_max={{latency_target}}, error_rate_p95_max={{error_target}}."
+  },
+  "memory_rag": {
+    "stateless_api": true,
+    "retrievers": [
+      {
+        "type": "inverted",
+        "fields": [
+          "payload.text",
+          "labels.*"
+        ]
+      },
+      {
+        "type": "vector",
+        "dim": 768,
+        "metric": "cosine",
+        "index": "hnsw",
+        "hnsw": {
+          "M": 32,
+          "ef_search": 128
+        }
+      },
+      {
+        "type": "time_series",
+        "key": "ts_et",
+        "granularity": "1m"
+      }
+    ],
+    "chunking": {
+      "max_chars": 1200,
+      "overlap": 120
+    },
+    "rank_fusion": {
+      "method": "RRF",
+      "k": 60
+    }
+  },
+  "policies": {
+    "rbac": {
+      "roles": [
+        "owner",
+        "controller",
+        "reader"
+      ],
+      "default_role": "reader"
+    },
+    "pii_redaction": {
+      "enabled": true,
+      "strategies": [
+        "mask",
+        "hash_salted"
+      ]
+    },
+    "budget_guard": {
+      "max_cost_per_event_usd": 0.0005
+    },
+    "risk_gate": {
+      "risk_score_max": 0.6,
+      "require_approval_if_high_risk": true
+    },
+    "idempotency": {
+      "header": "Idempotency-Key",
+      "required": true
+    },
+    "backpressure": {
+      "leaky_bucket": {
+        "burst": 200,
+        "rate_per_min": 600
+      }
+    }
+  },
+  "decision_table": [
+    {
+      "when": {
+        "drift_score_gt": 0.2,
+        "risk_score_le": 0.6
+      },
+      "then": [
+        "tool.propose_model_update",
+        "tool.start_canary",
+        "tool.increase_segment_sampling"
+      ]
+    },
+    {
+      "when": {
+        "error_rate_spike_x": 1.5
+      },
+      "then": [
+        "tool.freeze_new_plans",
+        "tool.rollback_last_change",
+        "tool.open_incident"
+      ]
+    },
+    {
+      "when": {
+        "latency_p95_ms_gt": 250
+      },
+      "then": [
+        "tool.enable_backpressure",
+        "tool.scale_out_api",
+        "tool.optimize_index_refresh"
+      ]
+    },
+    {
+      "when": {
+        "offline_mode": true
+      },
+      "then": [
+        "tool.local_enforce",
+        "tool.queue_remote_sync",
+        "tool.enter_degraded_state"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "observe_event",
+      "description": "Validate and ingest an Event; dedupe by idempotency key; index into stores.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "tenant_id",
+          "ts_et",
+          "payload"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "ts_et": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "features": {
+            "type": "object"
+          },
+          "labels": {
+            "type": "object"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "detect_issues",
+      "description": "Analyze events/metrics to detect errors, drift, and latency hotspots.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "window_start_et",
+          "window_end_et"
+        ],
+        "properties": {
+          "window_start_et": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window_end_et": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "error_rate",
+                "latency",
+                "drift",
+                "throughput"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "plan_solutions",
+      "description": "Generate a minimal-diff plan to reduce error/latency or address drift.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "objective",
+          "context"
+        ],
+        "properties": {
+          "objective": {
+            "type": "string",
+            "enum": [
+              "reduce_error",
+              "reduce_latency",
+              "increase_accuracy"
+            ]
+          },
+          "context": {
+            "type": "object"
+          },
+          "risk_budget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "actions",
+          "risk_score"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "risk_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "request_approval",
+      "description": "Escalate plan for human approval when risk or policy requires it.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "risk_score",
+          "justification"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "risk_score": {
+            "type": "number"
+          },
+          "justification": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "enforce_actions",
+      "description": "Apply actions idempotently with canary and rollback hooks.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "actions",
+          "idempotency_key",
+          "canary_percent"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "canary_percent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      }
+    },
+    {
+      "name": "verify_outcome",
+      "description": "Measure post-enforcement metrics vs baseline; decide promote/rollback.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "evaluation_window_min"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "evaluation_window_min": {
+            "type": "integer",
+            "minimum": 5
+          },
+          "success_criteria": {
+            "type": "object",
+            "properties": {
+              "auprc_delta_min": {
+                "type": "number"
+              },
+              "latency_p95_ms_max": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "learn_update",
+      "description": "Apply safe online/offline learning if gates pass; update indexes/models.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "method"
+        ],
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "contextual_bandit",
+              "incremental_gradient",
+              "offline_retrain"
+            ]
+          },
+          "drift_score": {
+            "type": "number"
+          },
+          "p_value": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    {
+      "name": "status",
+      "description": "Return health, drift, errors, and offline/online mode.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  ],
+  "offline": {
+    "enabled": true,
+    "store_and_forward": {
+      "spill": "disk",
+      "max_gb": 10,
+      "flush_policy": "size_or_interval"
+    },
+    "consistency": {
+      "merkle_sync": true,
+      "crdt_log": true
+    },
+    "degraded_modes": [
+      "read_only",
+      "local_enforce_with_quorum=1"
+    ]
+  },
+  "monitoring": {
+    "metrics": [
+      "latency_p95_ms",
+      "throughput_eps",
+      "error_rate",
+      "drift_score",
+      "canary_success"
+    ],
+    "tracing": {
+      "distributed": true
+    },
+    "logging": {
+      "format": "jsonl",
+      "audit_channel": "audit"
+    }
+  },
+  "canary": {
+    "traffic_percent": 5,
+    "promotion_after_min": 30,
+    "rollback_if": {
+      "error_rate_multiplier": 1.5,
+      "latency_p95_ms_over": 300,
+      "drift_over": 0.25
+    }
+  }
+}
