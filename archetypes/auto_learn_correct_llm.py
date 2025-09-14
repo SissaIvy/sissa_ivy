@@ -1,4 +1,26 @@
-# AutoLearnCorrectLLM spec as Python
+"""
+AUTO_LEARN_CORRECT_LLM configuration specification.
+
+This module defines the AUTO_LEARN_CORRECT_LLM configuration as a Python dictionary.
+The configuration is intended for use in systems implementing a function-calling LLM agent
+with detect→plan→enforce→verify→learn (DSRV) framing, stateless APIs, scalable indexing (RAG),
+and offline continuity.
+
+Main sections:
+  - canary: Canary deployment and rollback policies.
+  - decision_table: Rules for automated actions based on system metrics.
+  - memory_rag: Retrieval-augmented generation (RAG) memory and indexing configuration.
+  - meta: Metadata about the agent, including description, version, and owner.
+  - model: LLM model parameters and provider information.
+  - monitoring: Logging, metrics, and tracing configuration.
+  - offline: Offline mode and data consistency strategies.
+  - policies: Access, risk, and operational policies.
+  - prompts: Prompt templates for different agent roles.
+  - tools: Tool definitions for agent actions.
+
+Usage:
+    Import this module and use the AUTO_LEARN_CORRECT_LLM dictionary as needed.
+"""
 AUTO_LEARN_CORRECT_LLM = {'canary': {'promotion_after_min': 30,
             'rollback_if': {'drift_over': 0.25,
                             'error_rate_multiplier': 1.5,
