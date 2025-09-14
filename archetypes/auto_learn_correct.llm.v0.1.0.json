@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "name": "AutoLearnCorrectLLM",
+    "version": "0.1.0",
+    "generated_at_et": "2025-09-10T20:22:00-04:00",
+    "owner_role": "Atlas Reverse Engineer (ARE)",
+    "description": "Function-calling LLM agent implementing detect→plan→enforce→verify→learn with DSRV framing, stateless APIs, scalable indexing (RAG), and offline continuity."
+  },
+  "model": {
+    "provider": "vendor_agnostic",
+    "model_id": "llm_function_calling",
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "max_tokens": 2048,
+    "tool_choice": "auto",
+    "json_mode": true
+  },
+  "tools": [
+    {
+      "name": "observe_event",
+      "description": "Validate and ingest an Event; dedupe by idempotency key; index into stores.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "tenant_id",
+          "ts_et",
+          "payload"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "ts_et": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payload": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ]
+}
