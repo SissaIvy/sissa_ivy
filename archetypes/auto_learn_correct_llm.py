@@ -23,8 +23,18 @@ def find_latest_spec_file() -> Path:
 SPEC_PATH = find_latest_spec_file()
 def main() -> None:
     """Pretty-print the AutoLearnCorrectLLM specification."""
-    with SPEC_PATH.open("r", encoding="utf-8") as f:
-        spec = json.load(f)
+    try:
+        with SPEC_PATH.open("r", encoding="utf-8") as f:
+            spec = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Specification file '{SPEC_PATH}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Failed to parse JSON in '{SPEC_PATH}': {e}", file=sys.stderr)
+        sys.exit(1)
+    except OSError as e:
+        print(f"Error: Could not open specification file '{SPEC_PATH}': {e}", file=sys.stderr)
+        sys.exit(1)
     json.dump(spec, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
 
