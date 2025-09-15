@@ -100,3 +100,27 @@ If a step cannot be satisfied, document the constraint in the PR description.
 
 ---
 For the full guardrails text, see [`./.github/copilot-instructions.md`](./.github/copilot-instructions.md).
+
+---
+## Development & Contribution
+
+See `CONTRIBUTING.md` for:
+
+* Environment setup
+* Guardrail-aligned workflow (Alignment → Review)
+* Test expectations and terminology normalization
+
+Security reporting process: `SECURITY.md` (do not open public issues for vulnerabilities).
+
+Quick commands:
+
+```bash
+# View LLM spec
+python -m archetypes.auto_learn_correct_llm
+
+# Dry-run terminology normalization
+python normalize_terminology.py . --check
+
+# Run tests (if pytest installed)
+pytest -q
+```
