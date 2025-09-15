@@ -28,12 +28,21 @@ DEFAULT_EXCLUDE_DIRS = {
     "node_modules", "venv", ".venv", "build", "dist", ".eggs",
 }
 
+codex/normalize-terminology-across-repository
 # Optional import: allow `--help` to work even if the dependency is missing.
 try:
     from terminology_normalizer import normalize  # type: ignore
     _IMPORT_ERROR: Optional[Exception] = None
     normalize = None
     _IMPORT_ERROR = e
+=======
+try:
+    # You already have this — keeping the import explicit and failure-friendly.
+    from terminology_normalizer import normalize  # type: ignore
+except Exception as e:  # noqa: BLE001
+    print(f"Failed to import 'terminology_normalizer.normalize': {e}", file=sys.stderr)
+    sys.exit(2)
+main
 
 
 @dataclass
@@ -293,6 +302,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = parse_args(argv)
+codex/normalize-terminology-across-repository
 
     if normalize is None:  # pragma: no cover - runtime dependency check
         print(
@@ -301,6 +311,8 @@ def main(argv: Optional[list[str]] = None) -> None:
         )
         sys.exit(2)
 
+=======
+main
     directory = Path(args.directory).resolve()
 
     if not directory.exists() or not directory.is_dir():
