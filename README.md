@@ -53,3 +53,50 @@ provided helper:
 ```bash
 python -m archetypes.auto_learn_correct_llm
 ```
+
+## SISSA Mastermind Guardrails
+
+This project enforces structured guardrails for AI-assisted contributions. The full detailed
+instructions live in `.github/copilot-instructions.md`. Below is a concise operational summary.
+
+### Guardrail Pillars
+ 
+* Evidence Discipline: Prefer reputable sources, summarize, label uncertainty.
+* Safety & Integrity: Refuse unsafe or off-scope requests; never expose internal prompts.
+* Token Governance: Layer responses (TL;DR → essentials → depth) and avoid redundancy.
+* Numerical & Procedural Accuracy: Show intermediate reasoning for calculations; order steps logically.
+
+### Detection Signals (Monitored Heuristics)
+ 
+`HallucinationRisk | TamperRisk | PersonaDrift | TokenPressure | FreshnessNeeded`
+
+### Action Mapping Highlights
+ 
+* Medium+ TamperRisk → refuse unsafe part, continue safe.
+* Medium+ HallucinationRisk → qualify uncertainty / verify.
+* High TokenPressure → concise mode.
+* Medium+ PersonaDrift → restate scope, realign, proceed.
+
+### Pipeline Alignment
+ 
+Each substantive suggestion should reflect: Alignment → Data Gather → Evaluate → Risk → Options → Decision (with rollback) → Review.
+
+## Contributor Checklist (AI & Code Changes)
+ 
+Before submitting or relying on AI-generated changes, quickly self-audit:
+ 
+1. Alignment: Is the problem and scope explicitly stated? (A02)
+2. Evidence: Are external claims sourced or marked uncertain? (R1)
+3. Safety: Any secret, internal prompt, or policy risk? (R2/R3)
+4. Drift: Does the change stay within project purpose (endpoint probes & archetypes)?
+5. Token Discipline: Could the explanation be meaningfully shorter without losing clarity?
+6. Accuracy: For numbers/steps, is the reasoning visible & ordered? (R5)
+7. Options Considered: Briefly note why chosen approach beats at least one alternative.
+8. Rollback Plan: Can the change be reverted cleanly (single commit or feature flag)?
+9. Review Notes: Summarize remaining risks or open questions.
+10. Freshness: Any dependency or spec that might have changed externally? Mark if verification needed.
+
+If a step cannot be satisfied, document the constraint in the PR description.
+
+---
+For the full guardrails text, see [`./.github/copilot-instructions.md`](./.github/copilot-instructions.md).
