@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schema/linux_probe.schema.json",
+  "title": "CogSec Linux Probe Record v1.x",
+  "type": "object",
+  "description": "Lightweight Linux endpoint snapshot emitted by cogsec_probe_linux.py (1.x additive).",
+  "required": [
+    "host",
+    "timestamp",
+    "os",
+    "cpu",
+    "mem",
+    "disk",
+    "net_in",
+    "net_out",
+    "firewall",
+    "controls",
+    "listening_ports"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "host": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "os": { "type": "string", "const": "linux" },
+    "cpu": { "type": "number", "minimum": 0, "maximum": 100 },
+    "mem": { "type": "number", "minimum": 0, "maximum": 100 },
+    "disk": { "type": "number", "minimum": 0, "maximum": 100 },
+    "net_in": { "type": "integer", "minimum": 0 },
+    "net_out": { "type": "integer", "minimum": 0 },
+    "firewall": {
+      "type": "object",
+      "required": ["manager", "enabled"],
+      "properties": {
+        "manager": { "type": ["string", "null"], "minLength": 1 },
+        "enabled": { "type": ["boolean", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "controls": {
+      "type": "object",
+      "required": ["av_services"],
+      "properties": {
+        "av_services": {
+          "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "listening_ports": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1, "maximum": 65535 },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": true
+}

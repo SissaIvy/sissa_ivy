@@ -1,0 +1,45 @@
+{
+  "name": "psyops-war-room",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "size:check": "node scripts/size_check.cjs dist 180",
+  "size:report": "node scripts/size_report.cjs dist",
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.51.0",
+    "clsx": "^2.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^20.12.12",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.3.0",
+    "@typescript-eslint/parser": "^8.3.0",
+    "@vitejs/plugin-react": "^5.0.2",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "jsdom": "^24.0.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.44.0",
+    "vite": "^5.4.8",
+    "vitest": "^2.0.5"
+  }
+}
