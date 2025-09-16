@@ -1,0 +1,1 @@
+{"host":"codespaces-bb4c66","timestamp":"2025-09-15T21:33:57.123465Z","os":"linux","cpu":100.0,"mem":54.76,"disk":73.58,"net_in":2092,"net_out":2736,"firewall":{"manager":"iptables","enabled":false},"controls":{"av_services":[]},"listening_ports":[128,511,512,4096]}

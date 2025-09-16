@@ -1,0 +1,52 @@
+name: Windows Probe Validation
+
+on:
+  push:
+    branches: [ main, codex/** ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  probe-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show PowerShell version
+        run: pwsh -NoLogo -Command "$PSVersionTable | Format-List *"
+
+      - name: Run probe (quick diagnostics)
+        shell: pwsh
+        run: |
+          $p = 'cogsec/collectors/Get-CogSecEndpointState.ps1'
+          $json = & pwsh -NoProfile -File $p -Quick -Diagnostics -JsonPath -
+          $obj = $json | ConvertFrom-Json
+          if(-not $obj.host){ throw 'Missing host in JSON output' }
+          if(-not $obj.schema_version){ throw 'Missing schema_version' }
+          Write-Host "Schema version: $($obj.schema_version)"
+
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module Pester -Force -Scope CurrentUser -MinimumVersion 5.3.0
+
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          Invoke-Pester -Path 'tests/windows' -CI -Output Detailed
+
+      - name: Archive probe JSON sample
+        if: always()
+        shell: pwsh
+        run: |
+          $p = 'cogsec/collectors/Get-CogSecEndpointState.ps1'
+          & pwsh -NoProfile -File $p -SampleSeconds 1 -JsonPath .\probe_sample.json
+          Get-ChildItem .\probe_sample.json
+        
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-json-sample
+          path: probe_sample.json

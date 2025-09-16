@@ -1,6 +1,6 @@
 # Pull Request Template
 
-Thank you for contributing! Please ensure this PR aligns with the **SISSA Mastermind Guardrails**.
+Thank you for contributing to **CogSecEndpointSecurity**! Please ensure this PR aligns with the **SISSA Mastermind Guardrails**.
 
 > Full guardrails reference: [`.github/copilot-instructions.md`](./copilot-instructions.md)
 

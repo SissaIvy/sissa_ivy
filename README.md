@@ -1,8 +1,17 @@
-# sissa_ivy
+# CogSecEndpointSecurity
+
+![Windows Probe Validation](https://github.com/${{github.repository}}/actions/workflows/windows-probe.yml/badge.svg)
+![War Room CI](https://github.com/${{github.repository}}/actions/workflows/warroom-ci.yml/badge.svg)
 
 Native endpoint probes for Windows and Linux that collect basic health and security posture
 without relying on a heavyweight agent. The probes emit a compact JSON record and, for Windows,
 optionally append a CSV line that matches the `cogsec_workflow.py` health schema.
+
+> Project Renamed: Formerly `sissa_ivy`. References to the old name in historical commits, tags, or external scripts should be updated. Backward compatibility notes:
+>
+> * Python package previously at `platform` → now `cogsec_platform` (to avoid stdlib clash)
+> * Repository level branding updated; functional module names for probes unchanged.
+>
 
 ## Collectors
 
@@ -102,6 +111,7 @@ If a step cannot be satisfied, document the constraint in the PR description.
 For the full guardrails text, see [`./.github/copilot-instructions.md`](./.github/copilot-instructions.md).
 
 ---
+
 ## Development & Contribution
 
 See `CONTRIBUTING.md` for:
@@ -124,3 +134,106 @@ python normalize_terminology.py . --check
 # Run tests (if pytest installed)
 pytest -q
 ```
+
+### Windows Probe CI
+
+The GitHub Actions workflow `windows-probe.yml` runs on `windows-latest` to:
+
+1. Execute the probe in quick + diagnostics mode (ensuring `schema_version` and required fields).
+2. Install and run Pester tests in `tests/windows`.
+3. Archive a sample JSON artifact (`probe_sample.json`).
+
+If you extend the probe schema, increment `schema_version` and update or add Pester tests validating new fields. Retain deprecated alias fields (e.g. `net_in`, `net_out`) for at least one minor version before removal.
+
+Badge above reflects latest workflow status. To run locally on Windows:
+
+```powershell
+pwsh -NoProfile -File .\cogsec\collectors\Get-CogSecEndpointState.ps1 -Quick -Diagnostics -JsonPath - | ConvertFrom-Json | Format-List *
+Invoke-Pester -Path tests/windows -CI
+```
+
+### Linux Probe Synthetic Tests
+
+A lightweight unit test (`tests/test_cogsec_probe_linux.py`) validates the shape and bounds of the Linux probe JSON using two synthetic records (normal + edge). This guards against accidental contract drift (field removal, type changes, or out-of-range percentages) without requiring privileged system calls during CI.
+
+Run just those tests:
+
+```bash
+pytest -q tests/test_cogsec_probe_linux.py
+```
+
+All percentage fields (`cpu`, `mem`, `disk`) are asserted to be within 0–100 and network counters non-negative integers. Add new assertions here if you extend the emitted record.
+
+### Linux Probe Schema & Validation
+
+The Linux probe output is validated by a permissive JSON Schema (`schema/linux_probe.schema.json`). Use the validator script to catch contract drift:
+
+```bash
+# Generate a live sample and validate via stdin
+python cogsec/collectors/cogsec_probe_linux.py | python scripts/validate_linux_probe.py -
+
+# Or validate an existing capture
+python scripts/validate_linux_probe.py sample_probe.json
+```
+
+Pretty-print and strict sampling checks:
+```bash
+python cogsec/collectors/cogsec_probe_linux.py --pretty --json-path -
+python cogsec/collectors/cogsec_probe_linux.py --strict --json-path probe.json || echo "strict gate tripped"
+```
+
+The strict gate returns exit code 2 when CPU, MEM, and DISK are all reported as 0.0 (heuristic sampling failure indicator).
+
+### Ingestion Prototype & Schema Validation
+
+An experimental local ingestion prototype is included to illustrate downstream processing patterns:
+
+* Schema: `schema/endpoint_state.schema.json` (JSON Schema draft 2020-12)
+* Ingestion service (SQLite): `cogsec_platform/ingestion_service.py` (formerly `platform/`)
+* Validator helper: `validate_probe_record.py`
+
+Run example:
+
+```bash
+python validate_probe_record.py sample.json
+python -m cogsec_platform.ingestion_service ingest sample.json
+python -m cogsec_platform.ingestion_service list
+python -m cogsec_platform.ingestion_service get HOSTNAME
+```
+
+Sample generation (Linux host) piping into validator:
+
+```bash
+python cogsec/collectors/cogsec_probe_linux.py | python validate_probe_record.py -
+```
+
+Schema Versioning Strategy:
+
+* Patch bump (1.1.1 -> 1.1.2): purely additive / non-breaking fields.
+* Minor bump (1.1.x -> 1.2.0): may deprecate alias fields (e.g. `net_in`, `net_out`).
+* Major bump (1.x.x -> 2.0.0): structural changes requiring client updates.
+
+Backward compatibility window: alias fields retained for at least one full minor cycle after introduction of canonical replacements.
+
+SLA (Prototype Phase):
+
+* Probe execution time: < 2s (Quick mode) / < (SampleSeconds + 2)s with sampling.
+* Data freshness target for summaries (future service): ≤ 5 minutes.
+* Validation failure response: reject ingestion with `ValidationError` (non-retryable without fix).
+
+Security Notes (Prototype):
+
+* No authentication or signing yet; production design should include message signing + transport TLS.
+* SQLite used for simplicity—replace with a durable store (PostgreSQL/ClickHouse) for scale.
+
+### War Room CI Workflows
+
+The unified CI workflow `warroom-ci.yml` runs both Python tests (Linux) and probe tests (Windows). The older `windows-probe.yml` remains temporarily for transition and will be deprecated after one stable release.
+
+Deprecation timeline:
+
+* Current release: Both workflows active.
+* Next minor: `windows-probe.yml` marked deprecated (README update).
+* Following minor: Legacy workflow removed.
+
+Use the War Room badge above to track consolidated status.

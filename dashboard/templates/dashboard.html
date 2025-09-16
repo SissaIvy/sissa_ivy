@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISSA Ivy Security Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .alert-critical { border-left: 5px solid #dc3545; }
+        .alert-warning { border-left: 5px solid #ffc107; }
+        .alert-info { border-left: 5px solid #17a2b8; }
+        .status-good { color: #28a745; }
+        .status-warning { color: #ffc107; }
+        .status-critical { color: #dc3545; }
+        .dashboard-header {
+            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .host-card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: transform 0.2s;
+        }
+        .host-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .security-score {
+            font-size: 3rem;
+            font-weight: bold;
+        }
+        .score-excellent { color: #28a745; }
+        .score-good { color: #17a2b8; }
+        .score-warning { color: #ffc107; }
+        .score-critical { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="refresh-indicator">
+        <div id="refreshStatus" class="badge bg-secondary">
+            <i class="fas fa-sync-alt"></i> Loading...
+        </div>
+    </div>
+
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-shield-alt"></i> SISSA Ivy Security Dashboard</h1>
+                    <p class="mb-0">Real-time endpoint security monitoring and threat detection</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="security-score" id="overallScore">--</div>
+                    <small>Security Score</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="metric-value" id="totalHosts">0</div>
+                            <div class="metric-label">Active Hosts</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-server fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="metric-value" id="totalAlerts">0</div>
+                            <div class="metric-label">Active Alerts</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="metric-value" id="failedLogins">0</div>
+                            <div class="metric-label">Failed Logins (24h)</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-user-times fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="metric-value" id="usbDevices">0</div>
+                            <div class="metric-label">USB Devices</div>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-usb fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5><i class="fas fa-chart-line"></i> System Performance Trends</h5>
+                    <div id="performanceChart"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5><i class="fas fa-shield-alt"></i> Security Events Timeline</h5>
+                    <div id="securityChart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hosts and Alerts Row -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="chart-container">
+                    <h5><i class="fas fa-server"></i> Host Status Overview</h5>
+                    <div id="hostsContainer"></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-bell"></i> Recent Alerts</h5>
+                    <div id="alertsContainer" style="max-height: 600px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+        let lastUpdateTime = 0;
+
+        function updateRefreshStatus(status, isLoading = false) {
+            const indicator = $('#refreshStatus');
+            const icon = indicator.find('i');
+            
+            if (isLoading) {
+                icon.removeClass().addClass('fas fa-sync-alt fa-spin');
+                indicator.removeClass().addClass('badge bg-primary');
+            } else {
+                icon.removeClass().addClass('fas fa-sync-alt');
+                indicator.removeClass().addClass('badge bg-success');
+            }
+            
+            indicator.contents().last()[0].textContent = ` ${status}`;
+        }
+
+        function calculateSecurityScore(summary, alerts) {
+            let score = 100;
+            
+            // Deduct for alerts
+            score -= summary.critical_alerts * 20;
+            score -= summary.warning_alerts * 5;
+            
+            // Deduct for failed logins
+            if (summary.failed_logins_total > 50) score -= 30;
+            else if (summary.failed_logins_total > 10) score -= 15;
+            
+            // Deduct for file changes
+            score -= summary.file_changes_total * 10;
+            
+            // Deduct for high resource usage
+            if (summary.avg_cpu > 90) score -= 10;
+            if (summary.avg_memory > 90) score -= 10;
+            if (summary.avg_disk > 95) score -= 15;
+            
+            return Math.max(0, Math.min(100, score));
+        }
+
+        function updateSecurityScore(score) {
+            const scoreElement = $('#overallScore');
+            scoreElement.text(score);
+            
+            scoreElement.removeClass('score-excellent score-good score-warning score-critical');
+            if (score >= 90) {
+                scoreElement.addClass('score-excellent');
+            } else if (score >= 75) {
+                scoreElement.addClass('score-good');
+            } else if (score >= 50) {
+                scoreElement.addClass('score-warning');
+            } else {
+                scoreElement.addClass('score-critical');
+            }
+        }
+
+        function updateSummaryCards(summary) {
+            $('#totalHosts').text(summary.total_hosts || 0);
+            $('#totalAlerts').text(summary.total_alerts || 0);
+            $('#failedLogins').text(summary.failed_logins_total || 0);
+            $('#usbDevices').text(summary.usb_devices_total || 0);
+        }
+
+        function formatTimestamp(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+
+        function getSeverityClass(severity) {
+            switch(severity) {
+                case 'critical': return 'alert-critical bg-danger text-white';
+                case 'warning': return 'alert-warning bg-warning';
+                case 'info': return 'alert-info bg-info text-white';
+                default: return 'alert-info';
+            }
+        }
+
+        function updateAlerts(alerts) {
+            const container = $('#alertsContainer');
+            container.empty();
+            
+            if (alerts.length === 0) {
+                container.html('<div class="alert alert-success"><i class="fas fa-check"></i> No recent alerts</div>');
+                return;
+            }
+            
+            alerts.slice(-20).reverse().forEach(alert => {
+                const alertHtml = `
+                    <div class="alert ${getSeverityClass(alert.severity)} mb-2">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>${alert.message}</strong><br>
+                                <small>Host: ${alert.host} | Type: ${alert.type}</small>
+                            </div>
+                            <small>${formatTimestamp(alert.timestamp)}</small>
+                        </div>
+                    </div>
+                `;
+                container.append(alertHtml);
+            });
+        }
+
+        function getHostStatusIcon(metrics) {
+            const hasAlerts = metrics.security && (
+                (metrics.security.failed_logins && metrics.security.failed_logins.count_24h > 10) ||
+                (metrics.security.file_integrity && metrics.security.file_integrity.modified_files.length > 0) ||
+                (metrics.security.usb_devices && !metrics.security.usb_devices.authorized_only)
+            );
+            
+            if (hasAlerts) return '<i class="fas fa-exclamation-triangle status-critical"></i>';
+            if (metrics.cpu > 80 || metrics.mem > 85 || metrics.disk > 90) return '<i class="fas fa-exclamation-circle status-warning"></i>';
+            return '<i class="fas fa-check-circle status-good"></i>';
+        }
+
+        function updateHosts(metrics) {
+            const container = $('#hostsContainer');
+            container.empty();
+            
+            if (metrics.length === 0) {
+                container.html('<div class="alert alert-warning">No host data available</div>');
+                return;
+            }
+            
+            metrics.forEach(host => {
+                const security = host.security || {};
+                const failedLogins = security.failed_logins ? security.failed_logins.count_24h : 0;
+                const usbDevices = security.usb_devices ? security.usb_devices.connected_devices.length : 0;
+                const fileChanges = security.file_integrity ? security.file_integrity.modified_files.length : 0;
+                
+                const hostHtml = `
+                    <div class="host-card">
+                        <div class="row align-items-center">
+                            <div class="col-md-2">
+                                <h6>${getHostStatusIcon(host)} ${host.host}</h6>
+                                <small class="text-muted">${host.os}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <strong>CPU:</strong> ${host.cpu}%<br>
+                                <strong>Memory:</strong> ${host.mem}%<br>
+                                <strong>Disk:</strong> ${host.disk}%
+                            </div>
+                            <div class="col-md-2">
+                                <strong>Failed Logins:</strong> ${failedLogins}<br>
+                                <strong>USB Devices:</strong> ${usbDevices}<br>
+                                <strong>File Changes:</strong> ${fileChanges}
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Firewall:</strong> ${host.firewall ? (host.firewall.enabled ? 'Active' : 'Inactive') : 'Unknown'}<br>
+                                <strong>AV Services:</strong> ${host.controls && host.controls.av_services ? host.controls.av_services.length : 0}<br>
+                                <strong>Listening Ports:</strong> ${host.listening_ports ? host.listening_ports.length : 0}
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Last Updated: ${formatTimestamp(host.timestamp)}</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.append(hostHtml);
+            });
+        }
+
+        function updatePerformanceChart(trends) {
+            const timestamps = trends.map(t => t.timestamp);
+            const cpuData = trends.map(t => t.cpu_avg);
+            const memoryData = trends.map(t => t.memory_avg);
+            const diskData = trends.map(t => t.disk_avg);
+            
+            const data = [
+                {
+                    x: timestamps,
+                    y: cpuData,
+                    name: 'CPU %',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {color: '#007bff'}
+                },
+                {
+                    x: timestamps,
+                    y: memoryData,
+                    name: 'Memory %',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {color: '#28a745'}
+                },
+                {
+                    x: timestamps,
+                    y: diskData,
+                    name: 'Disk %',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {color: '#ffc107'}
+                }
+            ];
+            
+            const layout = {
+                height: 300,
+                margin: {t: 20, b: 40, l: 40, r: 20},
+                xaxis: {title: 'Time'},
+                yaxis: {title: 'Usage %', range: [0, 100]},
+                showlegend: true
+            };
+            
+            Plotly.newPlot('performanceChart', data, layout, {responsive: true});
+        }
+
+        function updateSecurityChart(trends) {
+            const timestamps = trends.map(t => t.timestamp);
+            const failedLogins = trends.map(t => t.failed_logins);
+            const usbEvents = trends.map(t => t.usb_events);
+            
+            const data = [
+                {
+                    x: timestamps,
+                    y: failedLogins,
+                    name: 'Failed Logins',
+                    type: 'bar',
+                    marker: {color: '#dc3545'}
+                },
+                {
+                    x: timestamps,
+                    y: usbEvents,
+                    name: 'USB Events',
+                    type: 'bar',
+                    yaxis: 'y2',
+                    marker: {color: '#17a2b8'}
+                }
+            ];
+            
+            const layout = {
+                height: 300,
+                margin: {t: 20, b: 40, l: 40, r: 40},
+                xaxis: {title: 'Time'},
+                yaxis: {title: 'Failed Logins', side: 'left'},
+                yaxis2: {title: 'USB Events', side: 'right', overlaying: 'y'},
+                showlegend: true
+            };
+            
+            Plotly.newPlot('securityChart', data, layout, {responsive: true});
+        }
+
+        function refreshDashboard() {
+            updateRefreshStatus('Updating...', true);
+            
+            Promise.all([
+                $.get('/api/summary'),
+                $.get('/api/metrics'),
+                $.get('/api/alerts'),
+                $.get('/api/trends')
+            ]).then(([summary, metrics, alerts, trends]) => {
+                updateSummaryCards(summary);
+                updateHosts(metrics);
+                updateAlerts(alerts);
+                
+                if (trends.length > 0) {
+                    updatePerformanceChart(trends);
+                    updateSecurityChart(trends);
+                }
+                
+                const securityScore = calculateSecurityScore(summary, alerts);
+                updateSecurityScore(securityScore);
+                
+                lastUpdateTime = Date.now();
+                updateRefreshStatus(`Updated ${formatTimestamp(new Date())}`);
+            }).catch(error => {
+                console.error('Error refreshing dashboard:', error);
+                updateRefreshStatus('Update failed', false);
+            });
+        }
+
+        // Initialize dashboard
+        $(document).ready(function() {
+            refreshDashboard();
+            refreshInterval = setInterval(refreshDashboard, 30000); // Refresh every 30 seconds
+        });
+
+        // Cleanup on page unload
+        $(window).on('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>

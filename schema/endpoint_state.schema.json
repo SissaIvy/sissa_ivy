@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/cogsec/endpoint_state.schema.json",
+  "title": "CogSec Endpoint State",
+  "description": "Schema for Windows/Linux endpoint probe consolidated state record (schema_version 1.x line).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "host",
+    "timestamp",
+    "os",
+    "cpu",
+    "mem",
+    "disk",
+    "firewall_enabled",
+    "rdp_enabled",
+    "controls",
+    "patch"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.\\d+\\.\\d+$"},
+    "host": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "os": {"type": "string"},
+    "cpu": {"type": "number", "minimum": 0, "maximum": 100},
+    "mem": {"type": "number", "minimum": 0, "maximum": 100},
+    "disk": {"type": "number", "minimum": 0, "maximum": 100},
+    "net_in_bps": {"type": "number", "minimum": 0},
+    "net_out_bps": {"type": "number", "minimum": 0},
+    "net_in": {"type": "number", "minimum": 0},
+    "net_out": {"type": "number", "minimum": 0},
+    "firewall_enabled": {"type": ["boolean", "null"]},
+    "rdp_enabled": {"type": ["boolean", "null"]},
+    "rdp_nla_enabled": {"type": ["boolean", "null"]},
+    "controls": {
+      "type": "object",
+      "required": ["av_vendor", "services"],
+      "properties": {
+        "av_vendor": {"type": ["string", "null"]},
+        "av_enabled": {"type": ["boolean", "null"]},
+        "rtp_enabled": {"type": ["boolean", "null"]},
+        "tamper_protection": {"type": ["boolean", "null"]},
+        "defs_age_days": {"type": ["number", "null"]},
+        "services": {"type": "object", "additionalProperties": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "patch": {
+      "type": "object",
+      "required": ["missing", "required_total", "missing_count"],
+      "properties": {
+        "patch_compliance_pct": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+        "missing": {"type": "array", "items": {"type": "string"}},
+        "required_total": {"type": "number", "minimum": 0},
+        "missing_count": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "message"],
+        "properties": {
+          "component": {"type": "string"},
+          "message": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}
