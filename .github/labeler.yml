@@ -1,0 +1,14 @@
+archetypes:
+  - 'archetypes/**'
+cogsec:
+  - 'cogsec/**'
+integrations:
+  - 'integrations/**'
+automation:
+  - 'scripts/**'
+ui:
+  - 'ui/**'
+ci:
+  - '.github/**'
+generated:
+  - 'reports/**'

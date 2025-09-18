@@ -1,0 +1,23 @@
+## workflow update trigger: $(date)
+name: hygiene
+  # Trivial edit to force workflow file update
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - '**'
+permissions:
+  contents: read
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: python scripts/normalize_unicode.py --check || (echo "::error ::smart punctuation/control chars found"; exit 1)
+      - run: python scripts/check_no_bidi.py
+      - run: python scripts/check_repo_layout.py
+      - run: test -f scripts/check_json_sanity.py && python scripts/check_json_sanity.py || true
+      - run: test -f scripts/check_yaml_sanity.py && python scripts/check_yaml_sanity.py || true

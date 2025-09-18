@@ -1,0 +1,4 @@
+# Security Dashboard Requirements
+flask>=2.3.0
+plotly>=5.17.0
+pandas>=2.0.0

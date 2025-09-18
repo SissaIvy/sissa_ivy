@@ -236,13 +236,21 @@ def run(
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Normalize terminology in text files (.md, .py by default)."
+        description="Normalize terminology in text files (.md, .py by default).",
+        epilog=(
+            "Exit codes: 0 = OK/no changes, 1 = would change (with --check), 2 = error. "
+            "Examples:\n"
+            "  normalize_terminology.py . --check\n"
+            "  normalize_terminology.py docs --ext .md --ext .txt -n\n"
+            "  normalize_terminology.py src --backup --workers 4"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("directory", help="Directory to scan")
     p.add_argument(
-        "--dry-run",
+        "-n","--dry-run",
         action="store_true",
-        help="Show unified diffs without modifying files",
+        help="Show unified diffs without modifying files (shorthand -n)",
     )
     p.add_argument(
         "--check",
@@ -299,8 +307,9 @@ def main(argv: Optional[list[str]] = None) -> None:
         print(f"Not a directory: {directory}", file=sys.stderr)
         sys.exit(2)
 
-    exts = set(e.lower() if e.startswith(".") else f".{e.lower()}"
-               for e in (args.exts or list(DEFAULT_EXTS)))
+    # Normalize extensions: ensure dot prefix & lowercase
+    raw_exts = args.exts or list(DEFAULT_EXTS)
+    exts = { (e if e.startswith('.') else f'.{e}').lower() for e in raw_exts }
     exclude_dirs = DEFAULT_EXCLUDE_DIRS.union(set(args.exclude_dir or []))
 
     exit_code = run(

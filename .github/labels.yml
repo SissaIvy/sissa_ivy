@@ -1,0 +1,24 @@
+- name: bug
+  color: d73a4a
+  description: Defect / incorrect behavior
+- name: enhancement
+  color: a2eeef
+  description: New capability or improvement
+- name: ci
+  color: 0e8a16
+  description: CI/CD and workflows
+- name: ui
+  color: 5319e7
+  description: Frontend / UX
+- name: cogsec
+  color: fbca04
+  description: Security collectors / probes
+- name: integrations
+  color: 1f883d
+  description: External systems / clients
+- name: automation
+  color: c5def5
+  description: Scripts, tooling, repo hygiene
+- name: generated
+  color: bfdadc
+  description: Generated artifacts (reports, dist)
