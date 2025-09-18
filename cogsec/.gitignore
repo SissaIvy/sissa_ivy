@@ -1,0 +1,14 @@
+### repo-hygiene (managed)
+__pycache__/
+.venv/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+coverage*
+*.log
+node_modules/
+ui/psyops-war-room/dist/
+dist/
+build/
+reports/
+!reports/.gitkeep
