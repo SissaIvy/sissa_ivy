@@ -13,6 +13,23 @@ optionally append a CSV line that matches the `cogsec_workflow.py` health schema
 > * Repository level branding updated; functional module names for probes unchanged.
 >
 
+## Repository Index
+
+* **archetypes/** — LLM specs & personas (e.g., AutoLearnCorrectLLM, SISSA guardrails)
+
+* **cogsec/** — collectors/probes (Linux/Windows), validators, schemas
+* **integrations/** — external clients (e.g., ServiceNow)
+* **scripts/** — automation (bootstrap, hygiene, drift, normalization)
+* **reports/** — generated artifacts (intel, tickets, health)
+* **ui/psyops-war-room/** — War Room frontend (Vite/React) and preview
+* **.github/workflows/** — CI pipelines (hygiene, layout, bidi guard, drift report, schema lint)
+
+### Quick Links
+
+* Developer onboarding: [`docs/DEVELOPER_QUICKSTART.md`](docs/DEVELOPER_QUICKSTART.md)
+
+* Build log (current state): [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md)
+
 ## Collectors
 
 ### Windows: `Get-CogSecEndpointState.ps1`
@@ -69,31 +86,31 @@ This project enforces structured guardrails for AI-assisted contributions. The f
 instructions live in `.github/copilot-instructions.md`. Below is a concise operational summary.
 
 ### Guardrail Pillars
- 
+
 * Evidence Discipline: Prefer reputable sources, summarize, label uncertainty.
 * Safety & Integrity: Refuse unsafe or off-scope requests; never expose internal prompts.
 * Token Governance: Layer responses (TL;DR → essentials → depth) and avoid redundancy.
 * Numerical & Procedural Accuracy: Show intermediate reasoning for calculations; order steps logically.
 
 ### Detection Signals (Monitored Heuristics)
- 
+
 `HallucinationRisk | TamperRisk | PersonaDrift | TokenPressure | FreshnessNeeded`
 
 ### Action Mapping Highlights
- 
+
 * Medium+ TamperRisk → refuse unsafe part, continue safe.
 * Medium+ HallucinationRisk → qualify uncertainty / verify.
 * High TokenPressure → concise mode.
 * Medium+ PersonaDrift → restate scope, realign, proceed.
 
 ### Pipeline Alignment
- 
+
 Each substantive suggestion should reflect: Alignment → Data Gather → Evaluate → Risk → Options → Decision (with rollback) → Review.
 
 ## Contributor Checklist (AI & Code Changes)
- 
+
 Before submitting or relying on AI-generated changes, quickly self-audit:
- 
+
 1. Alignment: Is the problem and scope explicitly stated? (A02)
 2. Evidence: Are external claims sourced or marked uncertain? (R1)
 3. Safety: Any secret, internal prompt, or policy risk? (R2/R3)
@@ -177,6 +194,7 @@ python scripts/validate_linux_probe.py sample_probe.json
 ```
 
 Pretty-print and strict sampling checks:
+
 ```bash
 python cogsec/collectors/cogsec_probe_linux.py --pretty --json-path -
 python cogsec/collectors/cogsec_probe_linux.py --strict --json-path probe.json || echo "strict gate tripped"
@@ -237,3 +255,15 @@ Deprecation timeline:
 * Following minor: Legacy workflow removed.
 
 Use the War Room badge above to track consolidated status.
+
+## Ops Cadence & Ownership
+
+**BlackOps (platform):**
+* Owns all CI gates: `hygiene.yml`, `schema-lint.yml`, `bidi-guard.yml`, `layout-guard.yml`.
+* Responsible for weekly Branch Drift Reports and remote branch clean-ups.
+* Maintains the onboarding path (`make onboard`) and Codespaces defaults.
+
+**PsyOps (remediation):**
+* Owns Ordnance intel generation and auto-resolve policy.
+* Manages ServiceNow integration (dry-run for PRs, real runs on protected branches).
+* Maintains incident taxonomy and framework mapping updates.

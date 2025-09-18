@@ -12,3 +12,4 @@ dist/
 build/
 reports/
 !reports/.gitkeep
+git push --force-with-lease
