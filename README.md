@@ -267,3 +267,34 @@ Use the War Room badge above to track consolidated status.
 * Owns Ordnance intel generation and auto-resolve policy.
 * Manages ServiceNow integration (dry-run for PRs, real runs on protected branches).
 * Maintains incident taxonomy and framework mapping updates.
+
+## CI Workflow Dispatch (Manual Triggering)
+
+To manually (re)run core guardrail workflows (`hygiene`, `schema-lint`, `bidi-guard`, `layout-guard`) from any subdirectory:
+
+```bash
+# Requires a PAT with 'repo' and 'workflow' scopes if the default GITHUB_TOKEN 403s.
+make ci-dispatch
+```
+
+The underlying script (`scripts/trigger_all_ci.sh`) will:
+
+1. Resolve repo root.
+2. Enumerate target workflow files.
+3. Attempt dispatch on the current branch, then fallback to the default branch.
+4. Provide colored diagnostics and token scope hints if a 403 (permission) error occurs.
+5. Summarize the latest runs (ID, workflow name, branch, status, conclusion, title).
+
+Direct usage without Make:
+
+```bash
+bash scripts/trigger_all_ci.sh
+```
+
+If you see: `Resource not accessible by integration`, authenticate with a classic Personal Access Token:
+
+```bash
+gh auth login --with-token < token.txt   # token must include: repo, workflow
+```
+
+Verify scopes via response headers (script prints `X-OAuth-Scopes`).

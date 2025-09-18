@@ -135,3 +135,8 @@ gh run list --limit 10 --json databaseId,displayTitle,headBranch,status,conclusi
 SH
 	chmod +x "$$ROOT/scripts/trigger_all_ci.sh"; \
 	echo "[ok] wrote $$ROOT/scripts/trigger_all_ci.sh"
+
+# Run existing enhanced workflow dispatcher script (requires PAT with repo+workflow if not using UI token)
+.PHONY: ci-dispatch
+ci-dispatch:
+| cd "$(ROOT)" && bash scripts/trigger_all_ci.sh || { echo "Hint: ensure 'gh auth login' with a PAT that includes 'workflow' scope"; exit 1; }
