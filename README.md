@@ -43,3 +43,19 @@ Enable the timer with `systemctl enable --now cogsec-probe.timer`.
 
 Both probes can be executed or monitored by **Cribl Edge** as Exec sources to forward
 the JSON output into existing pipelines.
+
+## Scripts
+
+### Repository Transfer Scripts
+
+The `scripts/` directory contains PowerShell and Bash scripts for transferring GitHub repositories from SissaIvy to mrobot787:
+
+- `transfer-repos.ps1` - PowerShell script using GitHub REST API with conflict detection and confirmation
+- `transfer-repos.sh` - Bash script using GitHub CLI (gh) for simple transfers
+- `README.md` - Detailed documentation for the transfer scripts
+
+These scripts handle the transfer of:
+- [Episodic-Memory-System-Python-](https://github.com/SissaIvy/Episodic-Memory-System-Python-)
+- [nlp-landing](https://github.com/SissaIvy/nlp-landing)
+
+See `scripts/README.md` for usage instructions and prerequisites.
