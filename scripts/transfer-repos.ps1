@@ -55,14 +55,14 @@ foreach ($repo in $Repos) {
     continue
   }
 
-  # Poll for new location (public GET is enough)
+  # Poll for new location (authenticated GET required for private repos)
   $finalName = if ($body.ContainsKey('new_name')) { $body.new_name } else { $repoName }
   $tries = 0
   do {
     Start-Sleep -Seconds 3
     $tries++
     try {
-      Invoke-RestMethod -Method Get -Uri "https://api.github.com/repos/$TargetOwner/$finalName" -ErrorAction Stop | Out-Null
+      Invoke-RestMethod -Headers $Headers -Method Get -Uri "https://api.github.com/repos/$TargetOwner/$finalName" -ErrorAction Stop | Out-Null
       Write-Host "Confirmed: https://github.com/$TargetOwner/$finalName"
       break
     } catch { }
