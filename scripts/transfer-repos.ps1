@@ -25,7 +25,7 @@ foreach ($repo in $Repos) {
   # Detect name conflict on target
   $exists = $false
   try {
-    Invoke-RestMethod -Headers $Headers -Method Get -Uri $targetUri -ErrorAction Stop | Out-Null
+    Invoke-RestMethod -Method Get -Uri $targetUri -ErrorAction Stop | Out-Null
     $exists = $true
   } catch { }
 
