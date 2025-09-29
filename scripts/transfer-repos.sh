@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Transfer repositories using GitHub CLI
 # Prerequisites: 
 # - Install GitHub CLI (gh)
