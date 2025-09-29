@@ -3,7 +3,15 @@
 # - Create a Personal Access Token (classic) for SissaIvy with 'repo' scope
 # - Paste it below
 
-$SOURCE_PAT = "<SISSAIVY_PAT>"
+# Read PAT from environment variable or prompt the user securely
+$SOURCE_PAT = $env:SISSAIVY_PAT
+if (-not $SOURCE_PAT) {
+    Write-Host "Enter the SissaIvy Personal Access Token (input will be hidden):"
+    $securePat = Read-Host -AsSecureString
+    $SOURCE_PAT = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePat)
+    )
+}
 $TargetOwner = "mrobot787"
 
 $Repos = @(
